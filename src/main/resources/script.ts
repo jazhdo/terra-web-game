@@ -11,6 +11,7 @@ abstract class Node {
     public onclick?: () => void;
     public onhover?: () => void;
     public onunhover?: () => void;
+    public collide = false;
 
     constructor(loc: Coordinate) {
         this.loc = loc;
@@ -23,19 +24,45 @@ abstract class Node {
     public getX() {
         return this.loc.x;
     }
-
+    
     public getY() {
         return this.loc.y;
     }
 
-    public setonclick(lambda: (node: Node) => void) {
+    public setLoc(newLoc: Coordinate) {
+        this.loc = newLoc;
+    }
+
+    public setX(newX: number) {
+        this.loc.x = newX;
+    }
+
+    public setY(newY: number) {
+        this.loc.y = newY;
+    }
+
+    // Collisions
+    public setCollide(newCollide: boolean) {
+        this.collide = newCollide;
+    }
+    public checkCollide() {
+        const currentScene = scenes[currentLayer];
+        for (const node of currentScene) {
+            // TODO: Add collision checking
+        }
+    }
+
+    public setonclick(lambda: (node: this) => void) {
         this.onclick = () => lambda(this);
+        return this;
     }
-    public setonhover(lambda: (node: Node) => void) {
+    public setonhover(lambda: (node: this) => void) {
         this.onhover = () => lambda(this);
+        return this;
     }
-    public setonunhover(lambda: (node: Node) => void) {
+    public setonunhover(lambda: (node: this) => void) {
         this.onunhover = () => lambda(this);
+        return this;
     }
 
     public abstract draw(ctx: CanvasRenderingContext2D): void;
@@ -311,19 +338,51 @@ const WIDTH = 1280, HEIGHT = 720;
 
 const scenes: Node[][] = [
     [
-        new RoundRect({x: 10, y: 10}, {x: WIDTH - 20, y: HEIGHT - 20}, Color.of("#888"), 1, Color.of("#000"), 100),
+        new RoundRect({x: 10, y: 10}, {x: WIDTH - 20, y: HEIGHT - 20}, Color.of("#888"), 1, Color.of("#000"), 100).setonhover((node) => node.setBackgroundColor(Color.of("#777"))).setonunhover((node) => node.setBackgroundColor(Color.of("#888"))),
+        new Circle({x: 100, y: 100}, 100, Color.of("#00000088")),
         new Text({x: 0, y: 360}, "TEST", Color.of("#000000"), 360, "Arial"),
         new Circle({x: 640, y: 360}, 300, Color.of("#00ff00")),
-        new Line({x: 20, y: 20}, {x: WIDTH - 40, y: HEIGHT - 40}, Color.of("#000"), "round", 5)
+        new Line({x: 20, y: 20}, {x: WIDTH - 40, y: HEIGHT - 40}, Color.of("#000"), "round", 5),
+        new Rect({x: 590, y: 310}, {x: 100, y: 100}, Color.of("#0f9369"))
     ]
 ];
+const inputMap = {
+    "up": [
+        "KeyW",
+        "ArrowUp",
+        "Space"
+    ],
+    "right": [
+        "KeyD",
+        "ArrowRight"
+    ],
+    "down": [
+        "KeyS",
+        "ArrowDown",
+    ],
+    "left": [
+        "KeyA",
+        "ArrowLeft"
+    ]
+};
 let currentLayer = 0;
+let keysDown: Set<string> = new Set();
 
 function start(): void {
     canvas.height = HEIGHT;
     canvas.width = WIDTH;
     canvas.onclick = onclick;
-    canvas.onmousemove = onmousemove;
+    document.onmousemove = onmousemove;
+    document.onkeydown = (ev: KeyboardEvent) => {
+        for (const [key, array] of Object.entries(inputMap)) {
+            if (array.includes(ev.code)) keysDown.add(key);
+        }
+    };
+    document.onkeyup = (ev: KeyboardEvent) => {
+        for (const [key, array] of Object.entries(inputMap)) {
+            if (array.includes(ev.code)) keysDown.delete(key);
+        }
+    };
 
     if (error === true) {
         console.error("An error occurred during startup, exiting...");
@@ -335,6 +394,14 @@ function start(): void {
 }
 
 function renderScreen(): void {
+    const player = scenes[0][5], SPEED = 10;
+    for (const key of keysDown) {
+        if (key === "up") player.setY(player.getY() - SPEED);
+        else if (key === "right") player.setX(player.getX() + SPEED);
+        else if (key === "down") player.setY(player.getY() + SPEED);
+        else if (key === "left") player.setX(player.getX() - SPEED);
+    }
+
     ctx.restore();
     ctx.save();
 
@@ -354,17 +421,14 @@ function getMousePosition(event: MouseEvent): Coordinate {
         y: Math.floor((event.clientY - offsets.top) * (canvas.height / offsets.height))
     };
 }
-function mousePositionInCanvas(pos: Coordinate): boolean {
-    // Notes: The screen goes from (0 -> WIDTH - 1) on the x and (0 -> HEIGHT - 1) on the y
-    return pos.x >= 0 && pos.y >= 0 && pos.x <= WIDTH - 1 && pos.y <= HEIGHT - 1;
-}
+// function mousePositionInCanvas(pos: Coordinate): boolean {
+//     // Notes: The screen goes from (0 -> WIDTH - 1) on the x and (0 -> HEIGHT - 1) on the y
+//     return pos.x >= 0 && pos.y >= 0 && pos.x <= WIDTH - 1 && pos.y <= HEIGHT - 1;
+// }
 
 // Listeners
 function onclick(this: GlobalEventHandlers, ev: PointerEvent): void {
     const mousePosition = getMousePosition(ev);
-
-    // Can't click any canvas elements while outside the canvas
-    if (!mousePositionInCanvas(mousePosition)) return;
 
     for (const node of scenes[currentLayer].toReversed()) {
         if (node.contains(mousePosition)) {
@@ -376,9 +440,6 @@ function onclick(this: GlobalEventHandlers, ev: PointerEvent): void {
 let currentlyHovered: Node | null = null;
 function onmousemove(this: GlobalEventHandlers, ev: MouseEvent): void {
     const mousePosition = getMousePosition(ev);
-
-    // Can't hover anything if the mouse is not in the canvas
-    if (!mousePositionInCanvas(mousePosition)) return;
 
     for (const node of scenes[currentLayer].toReversed()) {
         if (node.contains(mousePosition)) {
@@ -402,11 +463,8 @@ start();
 
 /*
 TODO: 
-Add hover, unhover, and click listeners.
-For click, just use a to-be-made getMousePosition or smth function and then check each one (later elements are rendered on top)
-For hover, use a list of Nodes that are hovered and run it once when they are added
-For unhover, use the above list of Nodes but run when it is no longer hovered.
-For the previous two, maybe just use one variable instead of a list because only the topmost element should recieve the hover so there's only one element to attribute the hover to
+Make more sophiscticated physics engine, config class, PhysicsDetails or smth class etc.
+Make GRAVITY!!!
 
 */
 
