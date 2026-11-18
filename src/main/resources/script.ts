@@ -12,6 +12,11 @@ abstract class Node {
     public onhover?: () => void;
     public onunhover?: () => void;
     public collide = false;
+    public physics: PhysicsProperties = {
+        velocity: 0,
+        acceleration: 9.8,
+        onGround: true
+    }
 
     constructor(loc: Coordinate) {
         this.loc = loc;
@@ -72,6 +77,12 @@ abstract class Node {
 type Size = {
     x: number,
     y: number
+}
+
+type PhysicsProperties = {
+    velocity: number,
+    acceleration: number,
+    onGround: boolean
 }
 
 class Rect extends Node {
@@ -152,14 +163,14 @@ class GradientRect extends Rect {
 }
 
 class RoundRect extends Rect {
-    protected borderRadius: [number, number?, number?, number?];
+    protected borderRadius: number;
 
-    constructor(topRightCorner: Coordinate, size: Size, backgroundColor: Color, borderWidth?: number, borderColor?: Color, ...borderRadius: [number, number?, number?, number?]) {
+    constructor(topRightCorner: Coordinate, size: Size, backgroundColor: Color, borderRadius: number, borderWidth?: number, borderColor?: Color) {
         super(topRightCorner, size, backgroundColor, borderWidth, borderColor);
         this.borderRadius = borderRadius;
     }
 
-    public setBorderRadius(newBorderRadius: [number, number?, number?, number?]) {
+    public setBorderRadius(newBorderRadius: number) {
         this.borderRadius = newBorderRadius;
     }
 
@@ -170,8 +181,23 @@ class RoundRect extends Rect {
             ctx.strokeStyle = this.borderColor.toString();
             ctx.lineWidth = this.borderWidth;
         }
-        ctx.roundRect(this.loc.x, this.loc.y, this.size.x, this.size.y, this.borderRadius.filter(number => number !== undefined));
+        ctx.roundRect(this.loc.x, this.loc.y, this.size.x, this.size.y, this.borderRadius);
         ctx.fill();
+    }
+
+    public contains(point: Coordinate) {
+        const circleRadius2Check = this.borderRadius + (this.borderWidth / 2);
+        return (
+            pointWithinCircle(point, {x: this.loc.x + this.borderRadius, y: this.loc.y + this.borderRadius}, circleRadius2Check) ||
+            pointWithinCircle(point, {x: this.loc.x + this.size.x - this.borderRadius, y: this.loc.y + this.borderRadius}, circleRadius2Check) ||
+            pointWithinCircle(point, {x: this.loc.x + this.size.x - this.borderRadius, y: this.loc.y + this.size.y - this.borderRadius}, circleRadius2Check) ||
+            pointWithinCircle(point, {x: this.loc.x + this.borderRadius, y: this.loc.y + this.size.y - this.borderRadius}, circleRadius2Check) ||
+
+            pointWithinRect(point, {x: this.loc.x + this.borderRadius, y: this.loc.y - (this.borderWidth / 2)}, {x: this.loc.x + this.size.x - this.borderRadius, y: this.loc.y + this.borderRadius}) ||
+            pointWithinRect(point, {x: this.loc.x + this.borderRadius, y: this.loc.y + this.size.y - this.borderRadius}, {x: this.loc.x + this.size.x - this.borderRadius, y: this.loc.y + this.size.y + (this.borderWidth / 2)}) ||
+
+            pointWithinRect(point, {x: this.loc.x - (this.borderWidth / 2), y: this.loc.y + this.borderRadius}, {x: this.loc.x + this.size.x + (this.borderWidth / 2), y: this.loc.y + this.size.y - this.borderRadius})
+        )
     }
 }
 
@@ -329,57 +355,70 @@ class Circle extends Node {
     }
 
     public contains(point: Coordinate) {
-        return Math.sqrt(((point.x - this.loc.x) ** 2) + ((point.y - this.loc.y) ** 2)) <= (this.radius + (this.borderWidth / 2));
+        return pointWithinCircle(point, this.loc, this.radius + (this.borderWidth / 2));
+    }
+}
+
+function pointWithinCircle(point: Coordinate, center: Coordinate, radius: number) {
+    return Math.sqrt(((point.x - center.x) ** 2) + ((point.y - center.y) ** 2)) <= radius;
+}
+
+// THE ONE AND ONLY CONFIG VARIABLE
+const CONFIG = {
+    WIDTH: 1280,
+    HEIGHT: 720,
+    PLAYER: {
+        SPEED: 20,
+        JUMP_HEIGHT: -100
+    },
+    INPUT_MAP: {
+        "up": [
+            "KeyW",
+            "ArrowUp",
+            "Space"
+        ],
+        "right": [
+            "KeyD",
+            "ArrowRight"
+        ],
+        "down": [
+            "KeyS",
+            "ArrowDown",
+        ],
+        "left": [
+            "KeyA",
+            "ArrowLeft"
+        ]
     }
 }
 
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
-const WIDTH = 1280, HEIGHT = 720;
 
 const scenes: Node[][] = [
     [
-        new RoundRect({x: 10, y: 10}, {x: WIDTH - 20, y: HEIGHT - 20}, Color.of("#888"), 1, Color.of("#000"), 100).setonhover((node) => node.setBackgroundColor(Color.of("#777"))).setonunhover((node) => node.setBackgroundColor(Color.of("#888"))),
+        new RoundRect({x: 10, y: 10}, {x: CONFIG.WIDTH - 20, y: CONFIG.HEIGHT - 20}, Color.of("#888"), 100, 1, Color.of("#000")).setonhover((node) => node.setBackgroundColor(Color.of("#777"))).setonunhover((node) => node.setBackgroundColor(Color.of("#888"))),
         new Circle({x: 100, y: 100}, 100, Color.of("#00000088")),
-        new Text({x: 0, y: 360}, "TEST", Color.of("#000000"), 360, "Arial"),
+        new Text({x: 0, y: 360}, "TEST", Color.of("#000000"), 360, "sans-serif"),
         new Circle({x: 640, y: 360}, 300, Color.of("#00ff00")),
-        new Line({x: 20, y: 20}, {x: WIDTH - 40, y: HEIGHT - 40}, Color.of("#000"), "round", 5),
-        new Rect({x: 590, y: 310}, {x: 100, y: 100}, Color.of("#0f9369"))
+        new Line({x: 20, y: 20}, {x: CONFIG.WIDTH - 40, y: CONFIG.HEIGHT - 40}, Color.of("#000"), "round", 5),
+        new Circle({x: 590, y: 310}, 50, Color.of("#0f9369"))
     ]
 ];
-const inputMap = {
-    "up": [
-        "KeyW",
-        "ArrowUp",
-        "Space"
-    ],
-    "right": [
-        "KeyD",
-        "ArrowRight"
-    ],
-    "down": [
-        "KeyS",
-        "ArrowDown",
-    ],
-    "left": [
-        "KeyA",
-        "ArrowLeft"
-    ]
-};
 let currentLayer = 0;
 let keysDown: Set<string> = new Set();
 
 function start(): void {
-    canvas.height = HEIGHT;
-    canvas.width = WIDTH;
+    canvas.height = CONFIG.HEIGHT;
+    canvas.width = CONFIG.WIDTH;
     canvas.onclick = onclick;
     document.onmousemove = onmousemove;
     document.onkeydown = (ev: KeyboardEvent) => {
-        for (const [key, array] of Object.entries(inputMap)) {
+        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) {
             if (array.includes(ev.code)) keysDown.add(key);
         }
     };
     document.onkeyup = (ev: KeyboardEvent) => {
-        for (const [key, array] of Object.entries(inputMap)) {
+        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) {
             if (array.includes(ev.code)) keysDown.delete(key);
         }
     };
@@ -394,21 +433,30 @@ function start(): void {
 }
 
 function renderScreen(): void {
-    const player = scenes[0][5], SPEED = 10;
+    // Inputs
+    const player = scenes[0][5];
     for (const key of keysDown) {
-        if (key === "up") player.setY(player.getY() - SPEED);
-        else if (key === "right") player.setX(player.getX() + SPEED);
-        else if (key === "down") player.setY(player.getY() + SPEED);
-        else if (key === "left") player.setX(player.getX() - SPEED);
+        if (key === "up") {
+            // Jump
+            if (player.physics.onGround) player.physics.velocity = -50;
+        } else if (key === "right") player.setX(player.getX() + CONFIG.PLAYER.SPEED);
+        else if (key === "left") player.setX(player.getX() - CONFIG.PLAYER.SPEED);
     }
 
+    // Physics (ground is on y500)
+    player.physics.onGround = player.getY() >= 500;
+    if (!player.physics.onGround) {
+        player.physics.velocity += player.physics.acceleration;
+    }
+    player.setY(Math.min(500, player.getY() + player.physics.velocity));
+
+    // Render
     ctx.restore();
     ctx.save();
-
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
+    ctx.clearRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
     scenes[currentLayer].forEach((node: Node) => node.draw(ctx));
 
+    // Next frame
     requestAnimationFrame(renderScreen);
 }
 
