@@ -8,12 +8,16 @@ let error = false;
 
 abstract class Node {
     protected loc: Coordinate;
-    private onclickFunction?: (node: Node) => void;
-    private onhoverFunction?: (node: Node) => void;
-    private onunhoverFunction?: (node: Node) => void;
+    public onclick?: () => void;
+    public onhover?: () => void;
+    public onunhover?: () => void;
 
     constructor(loc: Coordinate) {
         this.loc = loc;
+    }
+
+    public getLoc() {
+        return this.loc;
     }
 
     public getX() {
@@ -24,14 +28,14 @@ abstract class Node {
         return this.loc.y;
     }
 
-    public onclick(lambdaFunction: (node: Node) => void) {
-        this.onclickFunction = lambdaFunction;
+    public setonclick(lambda: (node: Node) => void) {
+        this.onclick = () => lambda(this);
     }
-    public onhover(lambdaFunction: (node: Node) => void) {
-        this.onhoverFunction = lambdaFunction;
+    public setonhover(lambda: (node: Node) => void) {
+        this.onhover = () => lambda(this);
     }
-    public onunhover(lambdaFunction: (node: Node) => void) {
-        this.onunhoverFunction = lambdaFunction;
+    public setonunhover(lambda: (node: Node) => void) {
+        this.onunhover = () => lambda(this);
     }
 
     public abstract draw(ctx: CanvasRenderingContext2D): void;
@@ -44,22 +48,50 @@ type Size = {
 }
 
 class Rect extends Node {
-    protected bg: Color;
+    protected backgroundColor: Color;
     protected size: Size;
+    protected borderWidth: number;
+    protected borderColor: Color;
 
-    constructor(topRightCorner: Coordinate, size: Size, bg: Color) {
+    constructor(topRightCorner: Coordinate, size: Size, backgroundColor: Color, borderWidth: number = 0, borderColor: Color = Color.of("#000")) {
         super(topRightCorner);
         this.size = size;
-        this.bg = bg;
+        this.backgroundColor = backgroundColor;
+        this.borderWidth = borderWidth;
+        this.borderColor = borderColor;
+    }
+
+    public setTopRightCorner(newCorner: Coordinate) {
+        this.loc = newCorner;
+    }
+
+    public setSize(newSize: Size) {
+        this.size = newSize;
+    }
+
+    public setBackgroundColor(newBackgroundColor: Color) {
+        this.backgroundColor = newBackgroundColor;
+    }
+
+    public setBorderWidth(newBorderWidth: number) {
+        this.borderWidth = newBorderWidth;
+    }
+
+    public setBorderColor(newBorderColor: Color) {
+        this.borderColor = newBorderColor;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
-        ctx.fillStyle = this.bg.toString();
+        ctx.fillStyle = this.backgroundColor.toString();
+        if (this.borderWidth > 0) {
+            ctx.strokeStyle = this.borderColor.toString();
+            ctx.lineWidth = this.borderWidth;
+        }
         ctx.fillRect(this.loc.x, this.loc.y, this.size.x, this.size.y);
     }
 
     public contains(point: Coordinate) {
-        return pointWithinRect(point, this.loc, {x: this.loc.x + this.size.x, y: this.loc.y + this.size.y});
+        return pointWithinRect(point, {x: this.loc.x - (this.borderWidth / 2), y: this.loc.y - (this.borderWidth / 2)}, {x: this.loc.x + this.size.x + (this.borderWidth / 2), y: this.loc.y + this.size.y + (this.borderWidth / 2)});
     }
 }
 
@@ -69,23 +101,50 @@ function pointWithinRect(point: Coordinate, rectStart: Coordinate, rectEnd: Coor
     return point.x >= startX && point.x <= endX && point.y >= startY && point.y <= endY;
 }
 
-class GradientRect extends Node {
+class GradientRect extends Rect {
     protected gradient: CanvasGradient;
-    protected size: Size;
 
     constructor(topRightCorner: Coordinate, size: Size, gradient: CanvasGradient) {
-        super(topRightCorner);
-        this.size = size;
+        super(topRightCorner, size, Color.of(""));
         this.gradient = gradient;
+    }
+
+    /**
+     * Disabled.
+     */
+    public override setBackgroundColor(newBackgroundColor: Color): void {}
+
+    public setGradient(newGradient: CanvasGradient) {
+        this.gradient = newGradient;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = this.gradient;
         ctx.fillRect(this.loc.x, this.loc.y, this.size.x, this.size.y);
     }
+}
 
-    public contains(point: Coordinate) {
-        return pointWithinRect(point, this.loc, {x: this.loc.x + this.size.x, y: this.loc.y + this.size.y});
+class RoundRect extends Rect {
+    protected borderRadius: [number, number?, number?, number?];
+
+    constructor(topRightCorner: Coordinate, size: Size, backgroundColor: Color, borderWidth?: number, borderColor?: Color, ...borderRadius: [number, number?, number?, number?]) {
+        super(topRightCorner, size, backgroundColor, borderWidth, borderColor);
+        this.borderRadius = borderRadius;
+    }
+
+    public setBorderRadius(newBorderRadius: [number, number?, number?, number?]) {
+        this.borderRadius = newBorderRadius;
+    }
+
+    public draw(ctx: CanvasRenderingContext2D) {
+        ctx.beginPath();
+        ctx.fillStyle = this.backgroundColor.toString();
+        if (this.borderWidth > 0) {
+            ctx.strokeStyle = this.borderColor.toString();
+            ctx.lineWidth = this.borderWidth;
+        }
+        ctx.roundRect(this.loc.x, this.loc.y, this.size.x, this.size.y, this.borderRadius.filter(number => number !== undefined));
+        ctx.fill();
     }
 }
 
@@ -96,12 +155,12 @@ class Color {
         this.value = value;
     }
 
-    public static ofHex(hex: string) {
+    public static of(hex: string) {
         return new this(hex);
     }
 
-    public static ofHSL(hue: number, saturation: number, lightness: number, alpha?: number) {
-        return new this("hsl(" + hue.toString() + ", " + (saturation / 100).toString() + ", " + (lightness / 100).toString() + ", " + (alpha !== undefined ? alpha.toString() : "1") + ")");
+    public static ofHSLA(hue: number, saturation: number, lightness: number, alpha?: number) {
+        return new this("hsla(" + hue.toString() + ", " + (saturation / 100).toString() + ", " + (lightness / 100).toString() + ", " + (alpha !== undefined ? alpha.toString() : "1") + ")");
     }
 
     public toString() {
@@ -152,12 +211,28 @@ class Line extends Node {
     protected lineCap: CanvasLineCap;
     protected lineWidth: number;
 
-    constructor(start: Coordinate, end: Coordinate, color: Color = Color.ofHex("#000"), lineCap: CanvasLineCap = "butt", lineWidth: number = 1) {
+    constructor(start: Coordinate, end: Coordinate, color: Color = Color.of("#000"), lineCap: CanvasLineCap = "butt", lineWidth: number = 1) {
         super(start);
         this.end = end;
         this.color = color;
         this.lineCap = lineCap;
         this.lineWidth = lineWidth;
+    }
+
+    public setEnd(newEnd: Coordinate) {
+        this.end = newEnd;
+    }
+
+    public setColor(newColor: Color) {
+        this.color = newColor;
+    }
+
+    public setLineCap(newLineCap: CanvasLineCap) {
+        this.lineCap = newLineCap;
+    }
+
+    public setLineWidth(newLineWidth: number) {
+        this.lineWidth = newLineWidth;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -166,6 +241,7 @@ class Line extends Node {
         ctx.lineTo(this.end.x, this.end.y);
         ctx.strokeStyle = this.color.toString();
         ctx.lineWidth = this.lineWidth;
+        ctx.lineCap = this.lineCap;
         ctx.stroke();
     }
 
@@ -189,12 +265,28 @@ class Circle extends Node {
     protected borderWidth: number;
     protected borderColor: Color;
 
-    constructor(center: Coordinate, radius: number, fill: Color, borderWidth: number = 0, borderColor: Color = Color.ofHex("#000")) {
+    constructor(center: Coordinate, radius: number, fill: Color, borderWidth: number = 0, borderColor: Color = Color.of("#000")) {
         super(center);
         this.radius = radius;
         this.fill = fill;
         this.borderWidth = borderWidth;
         this.borderColor = borderColor;
+    }
+
+    public setRadius(newRadius: number) {
+        this.radius = newRadius;
+    }
+
+    public setFill(newFill: Color) {
+        this.fill = newFill;
+    }
+
+    public setBorderWidth(newBorderWidth: number) {
+        this.borderWidth = newBorderWidth;
+    }
+
+    public setBorderColor(newBorderColor: Color) {
+        this.borderColor = newBorderColor;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -219,10 +311,10 @@ const WIDTH = 1280, HEIGHT = 720;
 
 const scenes: Node[][] = [
     [
-        new Rect({x: 0, y: 0}, {x: WIDTH, y: HEIGHT}, Color.ofHex("#888")),
-        new Text({x: 0, y: 360}, "TEST", Color.ofHex("#000"), 360, "Arial"),
-        new Circle({x: 640, y: 360}, 300, Color.ofHex("#00ff00")),
-        new Line({x: 10, y: 10}, {x: WIDTH - 10, y: HEIGHT - 10}, Color.ofHex("#000"), "butt", 5)
+        new RoundRect({x: 10, y: 10}, {x: WIDTH - 20, y: HEIGHT - 20}, Color.of("#888"), 1, Color.of("#000"), 100),
+        new Text({x: 0, y: 360}, "TEST", Color.of("#000000"), 360, "Arial"),
+        new Circle({x: 640, y: 360}, 300, Color.of("#00ff00")),
+        new Line({x: 20, y: 20}, {x: WIDTH - 40, y: HEIGHT - 40}, Color.of("#000"), "round", 5)
     ]
 ];
 let currentLayer = 0;
@@ -248,21 +340,62 @@ function renderScreen(): void {
 
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    scenes[currentLayer].forEach((node: Node) => {
-        node.draw(ctx);
-    });
+    scenes[currentLayer].forEach((node: Node) => node.draw(ctx));
 
     requestAnimationFrame(renderScreen);
 }
 
-// Listeners
-function onclick(): void {
-    scenes[currentLayer].toReversed().forEach((node: Node) => {
-        
-    });
+// Mouse position helpers
+function getMousePosition(event: MouseEvent): Coordinate {
+    const offsets = canvas.getBoundingClientRect();
+    // Calculate mouse position on the canvas's coordinate system and adjust for canvas scale
+    return {
+        x: Math.floor((event.clientX - offsets.left) * (canvas.width / offsets.width)),
+        y: Math.floor((event.clientY - offsets.top) * (canvas.height / offsets.height))
+    };
 }
-function onmousemove(): void {
+function mousePositionInCanvas(pos: Coordinate): boolean {
+    // Notes: The screen goes from (0 -> WIDTH - 1) on the x and (0 -> HEIGHT - 1) on the y
+    return pos.x >= 0 && pos.y >= 0 && pos.x <= WIDTH - 1 && pos.y <= HEIGHT - 1;
+}
 
+// Listeners
+function onclick(this: GlobalEventHandlers, ev: PointerEvent): void {
+    const mousePosition = getMousePosition(ev);
+
+    // Can't click any canvas elements while outside the canvas
+    if (!mousePositionInCanvas(mousePosition)) return;
+
+    for (const node of scenes[currentLayer].toReversed()) {
+        if (node.contains(mousePosition)) {
+            if (node.onclick !== undefined) node.onclick();
+            return;
+        }
+    }
+}
+let currentlyHovered: Node | null = null;
+function onmousemove(this: GlobalEventHandlers, ev: MouseEvent): void {
+    const mousePosition = getMousePosition(ev);
+
+    // Can't hover anything if the mouse is not in the canvas
+    if (!mousePositionInCanvas(mousePosition)) return;
+
+    for (const node of scenes[currentLayer].toReversed()) {
+        if (node.contains(mousePosition)) {
+            if (currentlyHovered !== node) {
+                if (node.onhover !== undefined) node.onhover();
+                if (currentlyHovered !== null && currentlyHovered.onunhover !== undefined) currentlyHovered.onunhover();
+                currentlyHovered = node;
+            }
+            return;
+        }
+    }
+
+    // If mouse is not on any element
+    if (currentlyHovered !== null) {
+        if (currentlyHovered.onunhover !== undefined) currentlyHovered.onunhover();
+        currentlyHovered = null;
+    }
 }
 
 start();
