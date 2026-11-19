@@ -1,8 +1,9 @@
 export {}
 
 // Creation of the canvas
+const main = document.getElementsByTagName("main")[0];
 const canvas = document.createElement("canvas");
-document.body.append(canvas);
+main.append(canvas);
 
 let error = false;
 
@@ -51,7 +52,7 @@ abstract class Node {
         this.collide = newCollide;
     }
     public checkCollide() {
-        const currentScene = scenes[currentLayer];
+        const currentScene = tmp.scenes[tmp.currentScene];
         for (const node of currentScene) {
             // TODO: Add collision checking
         }
@@ -228,7 +229,7 @@ class Text extends Node {
     protected fontSize: number;
     protected fontFamily: string;
 
-    constructor(bottomRightCorner: Coordinate, content: string, color: Color, fontSize: number, fontFamily: string, maxWidth?: number) {
+    constructor(bottomRightCorner: Coordinate, content: string, color: Color, fontSize: number, fontFamily: string = "sans-serif", maxWidth?: number) {
         super(bottomRightCorner);
         this.content = content;
         this.color = color;
@@ -369,7 +370,7 @@ const CONFIG = {
     HEIGHT: 720,
     PLAYER: {
         SPEED: 20,
-        JUMP_HEIGHT: -100
+        JUMP_HEIGHT: -70
     },
     INPUT_MAP: {
         "up": [
@@ -394,18 +395,63 @@ const CONFIG = {
 
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 
-const scenes: Node[][] = [
+const SCENES: Node[][] = [
+    // Menu
     [
-        new RoundRect({x: 10, y: 10}, {x: CONFIG.WIDTH - 20, y: CONFIG.HEIGHT - 20}, Color.of("#888"), 100, 1, Color.of("#000")).setonhover((node) => node.setBackgroundColor(Color.of("#777"))).setonunhover((node) => node.setBackgroundColor(Color.of("#888"))),
-        new Circle({x: 100, y: 100}, 100, Color.of("#00000088")),
-        new Text({x: 0, y: 360}, "TEST", Color.of("#000000"), 360, "sans-serif"),
-        new Circle({x: 640, y: 360}, 300, Color.of("#00ff00")),
-        new Line({x: 20, y: 20}, {x: CONFIG.WIDTH - 40, y: CONFIG.HEIGHT - 40}, Color.of("#000"), "round", 5),
-        new Circle({x: 590, y: 310}, 50, Color.of("#0f9369"))
+        // Background
+        new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#a6a6a6")),
+        new Text({x: 20, y: 150}, "A Web Game", Color.of("#000000"), 80),
+        new Text({x: 24, y: 183}, "Made by Jazhdo", Color.of("#000"), 30),
+
+    ],
+    [
+        // Front
+        new Circle({x: 590, y: 310}, 50, Color.of("#0f9369")),
+        new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35)
     ]
 ];
-let currentLayer = 0;
-let keysDown: Set<string> = new Set();
+type inputMapping = {
+    up?: () => void,
+    right?: () => void,
+    down?: () => void,
+    left?: () => void
+}
+const SCENE_INPUTS: inputMapping[] = [
+    {
+        up: () => {
+            
+        },
+        down: () => {
+
+        }
+    },
+    {
+        up: () => {
+            // Jump
+            const player = tmp.scenes[1][1];
+            if (player.physics.onGround) player.physics.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
+        },
+        left: () => {
+            const player = tmp.scenes[1][1];
+            player.setX(Math.max(50, player.getX() - CONFIG.PLAYER.SPEED));
+        },
+        right: () => {
+            const player = tmp.scenes[1][1];
+            player.setX(Math.min(CONFIG.WIDTH - 50, player.getX() + CONFIG.PLAYER.SPEED));
+        }
+    }
+];
+const SCENE_INIT: (() => void)[] = [
+    () => {
+        tmp.sceneMemory.set("currentOption", 0);
+    }
+];
+let tmp = {
+    scenes: SCENES,
+    sceneMemory: new Map<string, any>(),
+    currentScene: 0,
+    keysDown: new Set<string>()
+};
 
 function start(): void {
     canvas.height = CONFIG.HEIGHT;
@@ -413,14 +459,10 @@ function start(): void {
     canvas.onclick = onclick;
     document.onmousemove = onmousemove;
     document.onkeydown = (ev: KeyboardEvent) => {
-        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) {
-            if (array.includes(ev.code)) keysDown.add(key);
-        }
+        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) if (array.includes(ev.code)) tmp.keysDown.add(key);
     };
     document.onkeyup = (ev: KeyboardEvent) => {
-        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) {
-            if (array.includes(ev.code)) keysDown.delete(key);
-        }
+        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) if (array.includes(ev.code)) tmp.keysDown.delete(key);
     };
 
     if (error === true) {
@@ -428,22 +470,24 @@ function start(): void {
         return;
     }
 
+    SCENE_INIT[tmp.currentScene]();
+
     ctx.save();
     requestAnimationFrame(renderScreen);
 }
 
 function renderScreen(): void {
     // Inputs
-    const player = scenes[0][5];
-    for (const key of keysDown) {
-        if (key === "up") {
-            // Jump
-            if (player.physics.onGround) player.physics.velocity = -50;
-        } else if (key === "right") player.setX(player.getX() + CONFIG.PLAYER.SPEED);
-        else if (key === "left") player.setX(player.getX() - CONFIG.PLAYER.SPEED);
+    const currentSceneInputs = SCENE_INPUTS[tmp.currentScene];
+    for (const key of tmp.keysDown as Set<keyof inputMapping>) {
+        if (key in currentSceneInputs) {
+            const keyFunction = currentSceneInputs[key];
+            if (keyFunction) keyFunction();
+        }
     }
 
     // Physics (ground is on y500)
+    const player = tmp.scenes[1][1]
     player.physics.onGround = player.getY() >= 500;
     if (!player.physics.onGround) {
         player.physics.velocity += player.physics.acceleration;
@@ -454,10 +498,16 @@ function renderScreen(): void {
     ctx.restore();
     ctx.save();
     ctx.clearRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
-    scenes[currentLayer].forEach((node: Node) => node.draw(ctx));
+    tmp.scenes[tmp.currentScene].forEach((node: Node) => node.draw(ctx));
 
     // Next frame
     requestAnimationFrame(renderScreen);
+}
+
+function newScene(scene: number) {
+    tmp.keysDown = new Set<string>();
+    tmp.sceneMemory = new Map<string, any>();
+    tmp.currentScene = scene;
 }
 
 // Mouse position helpers
@@ -478,7 +528,7 @@ function getMousePosition(event: MouseEvent): Coordinate {
 function onclick(this: GlobalEventHandlers, ev: PointerEvent): void {
     const mousePosition = getMousePosition(ev);
 
-    for (const node of scenes[currentLayer].toReversed()) {
+    for (const node of tmp.scenes[tmp.currentScene].toReversed()) {
         if (node.contains(mousePosition)) {
             if (node.onclick !== undefined) node.onclick();
             return;
@@ -489,7 +539,7 @@ let currentlyHovered: Node | null = null;
 function onmousemove(this: GlobalEventHandlers, ev: MouseEvent): void {
     const mousePosition = getMousePosition(ev);
 
-    for (const node of scenes[currentLayer].toReversed()) {
+    for (const node of tmp.scenes[tmp.currentScene].toReversed()) {
         if (node.contains(mousePosition)) {
             if (currentlyHovered !== node) {
                 if (node.onhover !== undefined) node.onhover();
