@@ -447,9 +447,15 @@ const SCENES: Node[][] = [
         new Text({x: 24, y: 150}, "A Web Game", Color.of("#000000"), 80),
         new Text({x: 24, y: 183}, "Made by Jazhdo", Color.of("#000"), 30),
 
+        // Options' Hovers
+        new Rect({x: 0, y: 317}, {x: 276, y: 90}, Color.of("#00000000")).setonhover(() => scene0refreshOptions(() => 0)),
+        new Rect({x: 0, y: 407}, {x: 276, y: 40}, Color.of("#00000000")).setonhover(() => scene0refreshOptions(() => 1)),
+        new Rect({x: 0, y: 447}, {x: 276, y: 40}, Color.of("#00000000")).setonhover(() => scene0refreshOptions(() => 2)),
+        new Rect({x: 0, y: 487}, {x: 276, y: 90}, Color.of("#00000000")).setonhover(() => scene0refreshOptions(() => 3)),
+
         // Highlight
-        new RoundRect({x: 26, y: 367}, {x: 200, y: 42}, Color.of("#f3dc48b1"), 10),
-        
+        new RoundRect({x: 26, y: 367}, {x: 200, y: 42}, Color.of("#f3dc48b1"), 10).setonclick(scene0clickOption),
+
         // Options
         new Text({x: 30, y: 400}, "> Play", Color.of("#000"), 32, "monospace"),
         new Text({x: 30, y: 440}, "  Settings", Color.of("#000"), 32, "monospace"),
@@ -480,29 +486,26 @@ function clickRatelimited(): boolean {
 function scene0refreshOptions(newOption: (oldOption: number) => number) {
     const oldOption = tmp.sceneMemory.get("currentOption"), currentOption = newOption(oldOption);
     tmp.sceneMemory.set("currentOption", currentOption);
-    const oldText = tmp.scenes[tmp.currentScene][3 + oldOption] as Text;
+    const oldText = tmp.scenes[tmp.currentScene][7 + oldOption] as Text;
     oldText.setContent(" " + oldText.getContent().substring(1));
-    const newText = tmp.scenes[tmp.currentScene][3 + currentOption] as Text;
+    const newText = tmp.scenes[tmp.currentScene][7 + currentOption] as Text;
     newText.setContent(">" + newText.getContent().substring(1));
-    tmp.scenes[tmp.currentScene][2].setY((currentOption * 40) + 367);
+    tmp.scenes[tmp.currentScene][6].setY((currentOption * 40) + 367);
+}
+function scene0clickOption() {
+    const currentOption = tmp.sceneMemory.get("currentOption");
+    if (currentOption === 0) changeScene(1);
 }
 const SCENE_INPUTS: inputMapping[] = [
     {
         up: () => {
-            if (clickRatelimited()) return;
-            
-            scene0refreshOptions((oldOption) => oldOption === 0 ? 3 : oldOption - 1);
+            if (!clickRatelimited()) scene0refreshOptions((oldOption) => oldOption === 0 ? 3 : oldOption - 1);
         },
         down: () => {
-            if (clickRatelimited()) return;
-
-            scene0refreshOptions((oldOption) => oldOption === 3 ? 0 : oldOption + 1);
+            if (!clickRatelimited()) scene0refreshOptions((oldOption) => oldOption === 3 ? 0 : oldOption + 1);
         },
         enter: () => {
-            if (clickRatelimited()) return;
-
-            const currentOption = tmp.sceneMemory.get("currentOption");
-            if (currentOption === 0) changeScene(1);
+            if (!clickRatelimited()) scene0clickOption();
         }
     },
     {
@@ -623,8 +626,8 @@ function onmousemove(this: GlobalEventHandlers, ev: MouseEvent): void {
     for (const node of tmp.scenes[tmp.currentScene].toReversed()) {
         if (node.contains(mousePosition)) {
             if (currentlyHovered !== node) {
-                if (node.onhover !== undefined) node.onhover();
                 if (currentlyHovered !== null && currentlyHovered.onunhover !== undefined) currentlyHovered.onunhover();
+                if (node.onhover !== undefined) node.onhover();
                 currentlyHovered = node;
             }
             return;
@@ -642,8 +645,6 @@ start();
 
 /*
 TODO: 
-Make more sophiscticated physics engine, config class, PhysicsDetails or smth class etc.
-Make GRAVITY!!!
 
 */
 
