@@ -8,6 +8,7 @@
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
@@ -28,7 +29,6 @@
             <groupId>com.caoccao.javet</groupId>
             <artifactId>swc4j</artifactId>
             <version>2.2.0</version>
-            <scope>compile</scope>
         </dependency>
         <!-- Production server dependency -->
         <dependency>
@@ -77,6 +77,7 @@
                         </goals>
                         <configuration>
                             <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ComponentsXmlResourceTransformer"/>
                             </transformers>
                         </configuration>

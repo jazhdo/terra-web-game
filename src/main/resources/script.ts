@@ -229,13 +229,45 @@ class Text extends Node {
     protected fontSize: number;
     protected fontFamily: string;
 
-    constructor(bottomRightCorner: Coordinate, content: string, color: Color, fontSize: number, fontFamily: string = "sans-serif", maxWidth?: number) {
-        super(bottomRightCorner);
+    constructor(bottomLeftCorner: Coordinate, content: string, color: Color, fontSize: number, fontFamily: string = "sans-serif", maxWidth?: number) {
+        super(bottomLeftCorner);
         this.content = content;
         this.color = color;
         this.fontSize = fontSize;
         this.fontFamily = fontFamily;
         this.maxWidth = maxWidth;
+    }
+
+    public getContent() {
+        return this.content;
+    }
+    public getColor() {
+        return this.color;
+    }
+    public getFontSize() {
+        return this.fontSize;
+    }
+    public getFontFamily() {
+        return this.fontFamily;
+    }
+    public getMaxWidth() {
+        return this.maxWidth;
+    }
+
+    public setContent(newContent: string) {
+        this.content = newContent;
+    }
+    public setColor(newColor: Color) {
+        this.color = newColor;
+    }
+    public setFontSize(newFontSize: number) {
+        this.fontSize = newFontSize;
+    }
+    public setFontFamily(newFontFamily: string) {
+        this.fontFamily = newFontFamily;
+    }
+    public setMaxWidth(newMaxWidth: number) {
+        this.maxWidth = newMaxWidth;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -246,7 +278,34 @@ class Text extends Node {
 
     public contains(point: Coordinate) {
         // Until it is found out how to figure out the bounds of the box
-        return equalCoordinates(this.loc, point);
+        // return equalCoordinates(this.loc, point);
+        return false;
+    }
+}
+
+class Image extends Node {
+    protected image: HTMLImageElement;
+
+    constructor(topLeftCorner: Coordinate, imageSrc: string) {
+        super(topLeftCorner);
+        this.image = document.createElement("img");
+        this.image.src = imageSrc;
+    }
+
+    public getImage() {
+        return this.image;
+    }
+
+    public setImage(newImage: HTMLImageElement) {
+        this.image = newImage
+    }
+
+    public draw(ctx: CanvasRenderingContext2D): void {
+        ctx.drawImage(this.image, this.loc.x, this.loc.y);
+    }
+
+    public contains(point: Coordinate): boolean {
+        return pointWithinRect(point, this.loc, {x: this.loc.x + this.image.width, y: this.loc.y + this.image.height});
     }
 }
 
@@ -276,15 +335,12 @@ class Line extends Node {
     public setEnd(newEnd: Coordinate) {
         this.end = newEnd;
     }
-
     public setColor(newColor: Color) {
         this.color = newColor;
     }
-
     public setLineCap(newLineCap: CanvasLineCap) {
         this.lineCap = newLineCap;
     }
-
     public setLineWidth(newLineWidth: number) {
         this.lineWidth = newLineWidth;
     }
@@ -368,28 +424,17 @@ function pointWithinCircle(point: Coordinate, center: Coordinate, radius: number
 const CONFIG = {
     WIDTH: 1280,
     HEIGHT: 720,
+    CLICK_RATELIMIT_MS_LENGTH: 150,
     PLAYER: {
         SPEED: 20,
         JUMP_HEIGHT: -70
     },
     INPUT_MAP: {
-        "up": [
-            "KeyW",
-            "ArrowUp",
-            "Space"
-        ],
-        "right": [
-            "KeyD",
-            "ArrowRight"
-        ],
-        "down": [
-            "KeyS",
-            "ArrowDown",
-        ],
-        "left": [
-            "KeyA",
-            "ArrowLeft"
-        ]
+        "up": ["KeyW", "ArrowUp", "Space"],
+        "right": ["KeyD", "ArrowRight"],
+        "down": ["KeyS", "ArrowDown"],
+        "left": ["KeyA", "ArrowLeft"],
+        "enter": ["Enter", "Space"]
     }
 }
 
@@ -398,31 +443,66 @@ const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 const SCENES: Node[][] = [
     // Menu
     [
-        // Background
-        new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#a6a6a6")),
-        new Text({x: 20, y: 150}, "A Web Game", Color.of("#000000"), 80),
+        // Titles
+        new Text({x: 24, y: 150}, "A Web Game", Color.of("#000000"), 80),
         new Text({x: 24, y: 183}, "Made by Jazhdo", Color.of("#000"), 30),
 
+        // Highlight
+        new RoundRect({x: 26, y: 367}, {x: 200, y: 42}, Color.of("#f3dc48b1"), 10),
+        
+        // Options
+        new Text({x: 30, y: 400}, "> Play", Color.of("#000"), 32, "monospace"),
+        new Text({x: 30, y: 440}, "  Settings", Color.of("#000"), 32, "monospace"),
+        new Text({x: 30, y: 480}, "  About", Color.of("#000"), 32, "monospace"),
+        new Text({x: 30, y: 520}, "  Credits", Color.of("#000"), 32, "monospace"),
     ],
     [
-        // Front
+        // Platform
+        new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35),
+
+        // Player
         new Circle({x: 590, y: 310}, 50, Color.of("#0f9369")),
-        new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35)
     ]
 ];
 type inputMapping = {
     up?: () => void,
     right?: () => void,
     down?: () => void,
-    left?: () => void
+    left?: () => void,
+    enter?: () => void
+}
+function clickRatelimited(): boolean {
+    const lastPressed = (tmp.sceneMemory.get("last") || 0) as number, currentTime = Date.now();
+    if (currentTime - lastPressed <= CONFIG.CLICK_RATELIMIT_MS_LENGTH) return true;
+    tmp.sceneMemory.set("last", currentTime);
+    return false
+}
+function scene0refreshOptions(newOption: (oldOption: number) => number) {
+    const oldOption = tmp.sceneMemory.get("currentOption"), currentOption = newOption(oldOption);
+    tmp.sceneMemory.set("currentOption", currentOption);
+    const oldText = tmp.scenes[tmp.currentScene][3 + oldOption] as Text;
+    oldText.setContent(" " + oldText.getContent().substring(1));
+    const newText = tmp.scenes[tmp.currentScene][3 + currentOption] as Text;
+    newText.setContent(">" + newText.getContent().substring(1));
+    tmp.scenes[tmp.currentScene][2].setY((currentOption * 40) + 367);
 }
 const SCENE_INPUTS: inputMapping[] = [
     {
         up: () => {
+            if (clickRatelimited()) return;
             
+            scene0refreshOptions((oldOption) => oldOption === 0 ? 3 : oldOption - 1);
         },
         down: () => {
+            if (clickRatelimited()) return;
 
+            scene0refreshOptions((oldOption) => oldOption === 3 ? 0 : oldOption + 1);
+        },
+        enter: () => {
+            if (clickRatelimited()) return;
+
+            const currentOption = tmp.sceneMemory.get("currentOption");
+            if (currentOption === 0) changeScene(1);
         }
     },
     {
@@ -444,6 +524,7 @@ const SCENE_INPUTS: inputMapping[] = [
 const SCENE_INIT: (() => void)[] = [
     () => {
         tmp.sceneMemory.set("currentOption", 0);
+        tmp.sceneMemory.set("last", 0);
     }
 ];
 let tmp = {
@@ -504,7 +585,7 @@ function renderScreen(): void {
     requestAnimationFrame(renderScreen);
 }
 
-function newScene(scene: number) {
+function changeScene(scene: number) {
     tmp.keysDown = new Set<string>();
     tmp.sceneMemory = new Map<string, any>();
     tmp.currentScene = scene;
