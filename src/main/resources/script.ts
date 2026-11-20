@@ -1,11 +1,9 @@
 export {}
 
-// Creation of the canvas
-const main = document.getElementsByTagName("main")[0];
-const canvas = document.createElement("canvas");
-main.append(canvas);
-
 let error = false;
+
+// Creation of the canvas
+const canvas = document.getElementsByTagName("canvas")[0];
 
 abstract class Node {
     protected loc: Coordinate;
@@ -334,6 +332,19 @@ class Line extends Node {
         this.lineWidth = lineWidth;
     }
 
+    public getEnd() {
+        return this.end;
+    }
+    public getColor() {
+        return this.color;
+    }
+    public getLineCap() {
+        return this.lineCap;
+    }
+    public getLineWidth() {
+        return this.lineWidth;
+    }
+
     public setEnd(newEnd: Coordinate) {
         this.end = newEnd;
     }
@@ -439,7 +450,7 @@ const CONFIG = {
     CLICK_RATELIMIT_MS_LENGTH: 150,
     PLAYER: {
         SPEED: 20,
-        JUMP_HEIGHT: -60
+        JUMP_HEIGHT: -50
     },
     GRAVITY: 5,
     INPUT_MAP: {
@@ -481,6 +492,8 @@ const SCENES: Node[][] = [
 
         // Player
         new Circle({x: 590, y: 310}, 50, Color.of("#0f9369")),
+
+        // Menu
     ]
 ];
 type inputMapping = {
@@ -508,24 +521,11 @@ function scene0refreshOptions(newOption: (oldOption: number) => number) {
 function scene0clickOption() {
     const currentOption = tmp.sceneMemory.get("currentOption");
     if (currentOption === 0) changeScene(1);
-    else if (currentOption === 1) scene0menuPopup(0);
+    else scene0menuPopup(currentOption - 1);
 }
 function scene0menuPopup(menu: number) {
     const popupElements = [
         [
-            // Title
-            new Text({x: 64, y: 100}, "Settings", Color.of("#000"), 40),
-
-            // Exit button
-            new Circle({x: CONFIG.WIDTH - 85, y: 85}, 25, Color.of("#f00")).setonhover((node) => {
-                document.body.style.cursor = "pointer";
-                node.setFill(Color.of("#f44"))
-            }).setonunhover((node) => {
-                document.body.style.cursor = "";
-                node.setFill(Color.of("#f00"))
-            }).setonclick(() => tmp.scenes[0] = tmp.scenes[0].slice(0, -7)),
-            new Text({x: CONFIG.WIDTH - 93, y: 96}, "X", Color.of("#000"), 28, "monospace"),
-
             // Cheats toggle
             new Text({x: 64, y: 140}, "Cheats:", Color.of("#000"), 24, "sans-serif"),
             new Circle({x: 171, y: 131}, 11, localStorage.getItem("setting.cheats") === "true" ? Color.of("#0f0") : Color.of("#f00"), 1, Color.of("#444")).setonclick((node) => {
@@ -533,11 +533,38 @@ function scene0menuPopup(menu: number) {
                 localStorage.setItem("setting.cheats", cheats ? "false" : "true");
                 node.setFill(Color.of(cheats ? "#f00" : "#0f0"));
             }).setonhover(() => document.body.style.cursor = "pointer").setonunhover(() => document.body.style.cursor = "")
-        ]
-    ], popupBackground = new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#00000088")),
-    popup = new RoundRect({x: 40, y: 40}, {x: CONFIG.WIDTH - 80, y: CONFIG.HEIGHT - 80}, Color.of("#dcdcdc"), 40);
+        ],
+        [
 
-    tmp.scenes[0].push(popupBackground, popup, ...popupElements[menu]);
+        ],
+        [
+            
+        ]
+    ], commonElements = [
+        // Background
+        new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#00000088")),
+
+        // Popup
+        new RoundRect({x: 40, y: 40}, {x: CONFIG.WIDTH - 80, y: CONFIG.HEIGHT - 80}, Color.of("#dcdcdc"), 40),
+
+        // Title
+        new Text({x: 64, y: 100}, "Placeholder", Color.of("#000"), 40),
+
+        // Exit button
+        new Circle({x: CONFIG.WIDTH - 85, y: 85}, 25, Color.of("#f00")).setonhover((node) => {
+            document.body.style.cursor = "pointer";
+            node.setFill(Color.of("#e00"))
+        }).setonunhover((node) => {
+            document.body.style.cursor = "";
+            node.setFill(Color.of("#f00"))
+        }),
+        new Line({x: CONFIG.WIDTH - 75, y: 75}, {x: CONFIG.WIDTH - 95, y: 95}, Color.of("#000"), "round", 2),
+        new Line({x: CONFIG.WIDTH - 95, y: 75}, {x: CONFIG.WIDTH - 75, y: 95}, Color.of("#000"), "round", 2),
+    ], pageNames = ["Settings", "About", "Credits"];
+    (commonElements[2] as Text).setContent(pageNames[menu]);
+    commonElements[3].setonclick(() => tmp.scenes[0] = tmp.scenes[0].slice(0, -(6 + popupElements[menu].length)))
+
+    tmp.scenes[0].push(...commonElements, ...popupElements[menu]);
 }
 const SCENE_INPUTS: inputMapping[] = [
     {
@@ -555,12 +582,7 @@ const SCENE_INPUTS: inputMapping[] = [
         up: () => {
             // Jump
             const player = tmp.scenes[1][1];
-            if (player.getY() >= 500) {
-                console.log("Before Jumping: Player velo: " + player.physics.y.velocity + ", jump height: " + CONFIG.PLAYER.JUMP_HEIGHT);
-                player.physics.y.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
-                console.log("Jumping: Player velo: " + player.physics.y.velocity + ", jump height: " + CONFIG.PLAYER.JUMP_HEIGHT);
-                console.log("Jump player Position: (x: " + player.getX().toString() + ", y: " + player.getY().toString() + ")");
-            }
+            if (player.getY() >= 500) player.physics.y.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
         },
         left: () => {
             const player = tmp.scenes[1][1];
@@ -620,7 +642,6 @@ function renderScreen(): void {
         player.physics.y.velocity += player.physics.y.acceleration;
     } else if (player.getY() > 500) player.setY(500);
     player.setY(Math.min(500, player.getY() + player.physics.y.velocity));
-    console.log("Player Position: (x: " + player.getX().toString() + ", y: " + player.getY().toString() + ")");
 
     // Render
     ctx.restore();

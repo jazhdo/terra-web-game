@@ -5,15 +5,118 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Game</title>
     <style>
+html {
+    height: 100%;
+    width: 100%;
+}
+body {
+    margin: 0px;
+
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 24px 38px;
+
+    background-color: #ddd;
+}
+header h1 {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-size: 45px;
+    font-weight: 500;
+
+    margin: 0px;
+}
+nav {
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    gap: 25px;
+}
+nav a {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-size: 34px;
+    font-weight: 400;
+    color: black;
+    text-decoration: none;
+
+    width: 130px;
+    height: 54px;
+
+    border-radius: 54px;
+
+    background-color: #C4C4C4;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+}
+nav a:hover {
+    background-color: #BBB;
+
+    cursor: pointer;
+}
+main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+
+    width: 100%;
+}
 canvas {
     border: solid 1px black;
+}
+footer {
+    display: flex;
+    justify-content: space-around;
+
+    background-color: #ccc;
+
+    padding: 20px;
+}
+footer p {
+    font-family: system-ui;
+    font-size: 24px;
+    font-weight: 450;
+
+    margin: 0px;
 }
     </style>
 </head>
 <body>
     <header>
+        <h1>Game Viewer</h1>
+        <nav>
+            <a href="https://github.com/jazhdo/terra-web-game">Github</a>
+            <a href="https://itsjaz.com/">Author</a>
+        </nav>
     </header>
-    <main></main>
+    <main>
+        <canvas>
+            Your browser doesn't support the &lt;canvas&gt; element. Please use a browser that does to play this game.
+        </canvas>
+        <noscript>
+            <p>Your browser doesn't support Javascript. Please use a browser that does to play this game.</p>
+        </noscript>
+    </main>
+    <footer>
+        <p>Made by Jazhdo</p>
+        <p>11/16/2026 - 11/22/2026 @ Terra of Hack Club</p>
+    </footer>
     <script src="script.ts"></script>
 </body>
 </html>
