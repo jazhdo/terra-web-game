@@ -15,7 +15,7 @@ abstract class Node {
     public collide = false;
     public physics: PhysicsProperties = {
         velocity: 0,
-        acceleration: 9.8,
+        acceleration: CONFIG.GRAVITY,
         onGround: true
     }
 
@@ -427,8 +427,9 @@ const CONFIG = {
     CLICK_RATELIMIT_MS_LENGTH: 150,
     PLAYER: {
         SPEED: 20,
-        JUMP_HEIGHT: -70
+        JUMP_HEIGHT: -50
     },
+    GRAVITY: 4.9,
     INPUT_MAP: {
         "up": ["KeyW", "ArrowUp", "Space"],
         "right": ["KeyD", "ArrowRight"],
@@ -495,6 +496,36 @@ function scene0refreshOptions(newOption: (oldOption: number) => number) {
 function scene0clickOption() {
     const currentOption = tmp.sceneMemory.get("currentOption");
     if (currentOption === 0) changeScene(1);
+    else if (currentOption === 1) scene0menuPopup(0);
+}
+function scene0menuPopup(menu: number) {
+    const popupElements = [
+        [
+            // Title
+            new Text({x: 64, y: 100}, "Settings", Color.of("#000"), 40),
+
+            // Exit button
+            new Circle({x: CONFIG.WIDTH - 85, y: 85}, 25, Color.of("#f00")).setonhover((node) => {
+                document.body.style.cursor = "pointer";
+                node.setFill(Color.of("#f44"))
+            }).setonunhover((node) => {
+                document.body.style.cursor = "";
+                node.setFill(Color.of("#f00"))
+            }).setonclick(() => tmp.scenes[0] = tmp.scenes[0].slice(0, -7)),
+            new Text({x: CONFIG.WIDTH - 93, y: 96}, "X", Color.of("#000"), 28, "monospace"),
+
+            // Cheats toggle
+            new Text({x: 64, y: 140}, "Cheats:", Color.of("#000"), 24, "sans-serif"),
+            new Circle({x: 171, y: 131}, 11, localStorage.getItem("setting.cheats") === "true" ? Color.of("#0f0") : Color.of("#f00"), 1, Color.of("#444")).setonclick((node) => {
+                const cheats = localStorage.getItem("setting.cheats") === "true";
+                localStorage.setItem("setting.cheats", cheats ? "false" : "true");
+                node.setFill(Color.of(cheats ? "#f00" : "#0f0"));
+            }).setonhover(() => document.body.style.cursor = "pointer").setonunhover(() => document.body.style.cursor = "")
+        ]
+    ], popupBackground = new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#00000088")),
+    popup = new RoundRect({x: 40, y: 40}, {x: CONFIG.WIDTH - 80, y: CONFIG.HEIGHT - 80}, Color.of("#dcdcdc"), 40);
+
+    tmp.scenes[0].push(popupBackground, popup, ...popupElements[menu]);
 }
 const SCENE_INPUTS: inputMapping[] = [
     {
@@ -542,12 +573,8 @@ function start(): void {
     canvas.width = CONFIG.WIDTH;
     canvas.onclick = onclick;
     document.onmousemove = onmousemove;
-    document.onkeydown = (ev: KeyboardEvent) => {
-        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) if (array.includes(ev.code)) tmp.keysDown.add(key);
-    };
-    document.onkeyup = (ev: KeyboardEvent) => {
-        for (const [key, array] of Object.entries(CONFIG.INPUT_MAP)) if (array.includes(ev.code)) tmp.keysDown.delete(key);
-    };
+    document.onkeydown = (ev: KeyboardEvent) => Object.entries(CONFIG.INPUT_MAP).forEach((value: [string, string[]]) => value[1].includes(ev.code) && tmp.keysDown.add(value[0]));
+    document.onkeyup = (ev: KeyboardEvent) => Object.entries(CONFIG.INPUT_MAP).forEach((value: [string, string[]]) => value[1].includes(ev.code) && tmp.keysDown.delete(value[0]));
 
     if (error === true) {
         console.error("An error occurred during startup, exiting...");

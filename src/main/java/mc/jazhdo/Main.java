@@ -46,6 +46,8 @@ public class Main {
             return;
         }
 
+        log.info("Preload done. Startin Javalin web server...");
+
         Javalin webServer = Javalin.create(config -> {
             config.routes.get("/", ctx -> {
                 ctx.contentType("text/html");
@@ -62,5 +64,7 @@ public class Main {
         String definedPort = System.getenv("PORT");
         if (definedPort != null) webServer.start(Integer.parseInt(definedPort));
         else webServer.start();
+
+        log.info("Javalin web server started.");
     }
 }

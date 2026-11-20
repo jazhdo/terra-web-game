@@ -2,4 +2,4 @@
 .vscode
 
 # Compiled jars
-target/
+target/*
