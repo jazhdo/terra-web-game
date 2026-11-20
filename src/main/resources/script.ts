@@ -14,9 +14,10 @@ abstract class Node {
     public onunhover?: () => void;
     public collide = false;
     public physics: PhysicsProperties = {
-        velocity: 0,
-        acceleration: CONFIG.GRAVITY,
-        onGround: true
+        y: {
+            velocity: 0,
+            acceleration: CONFIG.GRAVITY
+        }
     }
 
     constructor(loc: Coordinate) {
@@ -81,9 +82,10 @@ type Size = {
 }
 
 type PhysicsProperties = {
-    velocity: number,
-    acceleration: number,
-    onGround: boolean
+    y: {
+        velocity: number,
+        acceleration: number
+    }
 }
 
 class Rect extends Node {
@@ -314,9 +316,9 @@ type Coordinate = {
     y: number
 }
 
-function equalCoordinates(first: Coordinate, second: Coordinate) {
-    return first.x === second.x && first.y === second.y;
-}
+// function equalCoordinates(first: Coordinate, second: Coordinate) {
+//     return first.x === second.x && first.y === second.y;
+// }
 
 class Line extends Node {
     protected end: Coordinate;
@@ -383,18 +385,28 @@ class Circle extends Node {
         this.borderColor = borderColor;
     }
 
+    public getRadius() {
+        return this.radius;
+    }
+    public getFill() {
+        return this.fill;
+    }
+    public getBorderWidth() {
+        return this.borderWidth;
+    }
+    public getBorderColor() {
+        return this.borderColor;
+    }
+
     public setRadius(newRadius: number) {
         this.radius = newRadius;
     }
-
     public setFill(newFill: Color) {
         this.fill = newFill;
     }
-
     public setBorderWidth(newBorderWidth: number) {
         this.borderWidth = newBorderWidth;
     }
-
     public setBorderColor(newBorderColor: Color) {
         this.borderColor = newBorderColor;
     }
@@ -427,9 +439,9 @@ const CONFIG = {
     CLICK_RATELIMIT_MS_LENGTH: 150,
     PLAYER: {
         SPEED: 20,
-        JUMP_HEIGHT: -50
+        JUMP_HEIGHT: -60
     },
-    GRAVITY: 4.9,
+    GRAVITY: 5,
     INPUT_MAP: {
         "up": ["KeyW", "ArrowUp", "Space"],
         "right": ["KeyD", "ArrowRight"],
@@ -543,7 +555,12 @@ const SCENE_INPUTS: inputMapping[] = [
         up: () => {
             // Jump
             const player = tmp.scenes[1][1];
-            if (player.physics.onGround) player.physics.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
+            if (player.getY() >= 500) {
+                console.log("Before Jumping: Player velo: " + player.physics.y.velocity + ", jump height: " + CONFIG.PLAYER.JUMP_HEIGHT);
+                player.physics.y.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
+                console.log("Jumping: Player velo: " + player.physics.y.velocity + ", jump height: " + CONFIG.PLAYER.JUMP_HEIGHT);
+                console.log("Jump player Position: (x: " + player.getX().toString() + ", y: " + player.getY().toString() + ")");
+            }
         },
         left: () => {
             const player = tmp.scenes[1][1];
@@ -597,13 +614,13 @@ function renderScreen(): void {
         }
     }
 
-    // Physics (ground is on y500)
-    const player = tmp.scenes[1][1]
-    player.physics.onGround = player.getY() >= 500;
-    if (!player.physics.onGround) {
-        player.physics.velocity += player.physics.acceleration;
-    }
-    player.setY(Math.min(500, player.getY() + player.physics.velocity));
+    // Gravity physics (ground is on y500)
+    const player = tmp.scenes[1][1];
+    if (player.getY() < 500) {
+        player.physics.y.velocity += player.physics.y.acceleration;
+    } else if (player.getY() > 500) player.setY(500);
+    player.setY(Math.min(500, player.getY() + player.physics.y.velocity));
+    console.log("Player Position: (x: " + player.getX().toString() + ", y: " + player.getY().toString() + ")");
 
     // Render
     ctx.restore();
