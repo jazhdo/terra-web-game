@@ -592,7 +592,7 @@ const SCENES: Node[][] = [
         new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35),
 
         // Player
-        new Circle({x: 590, y: 310}, 50, Color.of("#0f9369")),
+        new Circle({x: CONFIG.WIDTH / 2, y: CONFIG.HEIGHT / 2}, 50, Color.of("#0f9369")),
 
         // Menu toggle
         new RoundRect({x: CONFIG.WIDTH - 80, y: 16}, {x: 64, y: 64}, Color.of("#ccc"), 16),
@@ -637,11 +637,11 @@ function clickRatelimited(): boolean {
 function scene0refreshOptions(newOption: (oldOption: number) => number) {
     const oldOption = tmp.sceneMemory.get("currentOption"), currentOption = newOption(oldOption);
     tmp.sceneMemory.set("currentOption", currentOption);
-    const oldText = tmp.scenes[tmp.currentScene][7 + oldOption] as Text;
+    const oldText = tmp.scenes[0][7 + oldOption] as Text;
     oldText.setContent(" " + oldText.getContent().substring(1));
-    const newText = tmp.scenes[tmp.currentScene][7 + currentOption] as Text;
+    const newText = tmp.scenes[0][7 + currentOption] as Text;
     newText.setContent(">" + newText.getContent().substring(1));
-    tmp.scenes[tmp.currentScene][6].setY((currentOption * 40) + 367);
+    tmp.scenes[0][6].setY((currentOption * 40) + 367);
 }
 function scene0clickOption() {
     const currentOption = tmp.sceneMemory.get("currentOption");
@@ -749,31 +749,37 @@ let tmp = {
     keysDown: new Set<string>()
 };
 
-function anyCollision(point: Coordinate) {
-    const nodes = tmp.scenes[tmp.currentScene];
+function copyCoordinate(point: Coordinate) {
+    return {x: point.x, y: point.y};
+}
+function coordinateToString(point: Coordinate) {
+    return "(x: " + point.x + ", y: " + point.y + ")";
+}
+function anyCollision(point: Coordinate, check: Node) {
+    const nodes = tmp.scenes[1].filter(node => node !== check);
     for (const node of nodes) if (node.contains(point)) return true;
     return false;
 }
 function playerColliding(points: number) {
     const player = tmp.scenes[1][1] as Circle, check: Coordinate[] = [];
     if ((points >> 3) && 0b0001) {
-        const center = player.getLoc();
+        const center = copyCoordinate(player.getLoc());
         center.y += player.getRadius();
         check.push(center)
     } else if ((points >> 2) && 0b0001) {
-        const center = player.getLoc();
+        const center = copyCoordinate(player.getLoc());
         center.x += player.getRadius();
         check.push(center);
     } else if ((points >> 1) && 0b0001) {
-        const center = player.getLoc();
+        const center = copyCoordinate(player.getLoc());
         center.y -= player.getRadius();
         check.push(center);
     } else if (points && 0b0001) {
-        const center = player.getLoc();
+        const center = copyCoordinate(player.getLoc());
         center.x -= player.getRadius();
         check.push(center);
     }
-    for (const coord of check) if (anyCollision(coord)) return true;
+    for (const coord of check) if (anyCollision(coord, player)) return true;
     return false;
 }
 
@@ -787,11 +793,11 @@ function renderScreen(): void {
     const player = tmp.scenes[1][1];
     if (!playerColliding(0b1111)) {
         player.physics.y.velocity += player.physics.y.acceleration;
-        const newY = Math.min(CONFIG.HEIGHT, player.getY() + player.physics.y.velocity);
-        player.setY(newY);
-        console.log("New Y: " + newY);
-    } else console.log("Collided!");
-    console.log("Player Location: (x: " + player.getX() + ", y: " + player.getY() + ")");
+        const wantedY = player.getY() + player.physics.y.velocity;
+        console.log("Wanted y: " + wantedY)
+        player.setY(Math.min(CONFIG.HEIGHT, wantedY));
+    }
+    // console.log("Player Location: (x: " + player.getX() + ", y: " + player.getY() + ")");
 
     // Render
     ctx.restore();

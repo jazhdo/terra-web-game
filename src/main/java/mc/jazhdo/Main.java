@@ -22,7 +22,12 @@ public class Main {
     private static final Path root = Path.of("");
     private static final Path resourcePath = root.resolve("src/main/resources");
     private static final Logger log = LoggerFactory.getLogger(Main.class);
-    private static final boolean DEBUG = System.getenv("DEBUG").equals("TRUE");
+    private static final boolean DEBUG;
+    static {
+        String debugEnv = System.getenv("DEBUG");
+        if (debugEnv == null) DEBUG = false;
+        else DEBUG = debugEnv.equals("TRUE");
+    }
 
     private static byte[] getLivePage(String page) {
         try {
