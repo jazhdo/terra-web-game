@@ -49,6 +49,9 @@ public class Main {
         log.info("Preload done. Startin Javalin web server...");
 
         Javalin webServer = Javalin.create(config -> {
+            config.routes.before(ctx -> {
+                log.info("Recieved request to " + ctx.path());
+            });
             config.routes.get("/", ctx -> {
                 ctx.contentType("text/html");
                 ctx.header(Header.CONTENT_LENGTH, Integer.toString(indexPage.length));

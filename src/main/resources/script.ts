@@ -18,6 +18,9 @@ type Coordinate = {
     x: number,
     y: number
 }
+function equalCoordinates(one: Coordinate, two: Coordinate) {
+    return one.x === two.x && one.y === two.y;
+}
 
 let error = false;
 
@@ -397,11 +400,14 @@ class AnimatedLine extends Line {
 
     public draw(ctx: CanvasRenderingContext2D) {
         // Animated movement
-        this.loc.x += Math.min(this.animated.movesPerTick, this.animated.start.x - this.loc.x);
-        this.loc.y += Math.min(this.animated.movesPerTick, this.animated.start.y - this.loc.y);
-        this.end.x += Math.min(this.animated.movesPerTick, this.animated.end.x - this.end.x);
-        this.end.y += Math.min(this.animated.movesPerTick, this.animated.end.y - this.end.y);
-        console.log("Position: (x: " + this.loc.x + ", y: " + this.loc.y + ") to (x: " + this.end.x + ", y: " + this.end.y + ")");
+        if (this.animated.in) {
+            this.loc.x += Math.min(this.animated.movesPerTick, this.animated.start.x - this.loc.x);
+            this.loc.y += Math.min(this.animated.movesPerTick, this.animated.start.y - this.loc.y);
+            this.end.x += Math.min(this.animated.movesPerTick, this.animated.end.x - this.end.x);
+            this.end.y += Math.min(this.animated.movesPerTick, this.animated.end.y - this.end.y);
+            if (equalCoordinates(this.loc, this.animated.start) && equalCoordinates(this.end, this.animated.end)) this.animated.in = false;
+        }
+        // console.log("Position: (x: " + this.loc.x + ", y: " + this.loc.y + ") to (x: " + this.end.x + ", y: " + this.end.y + ")");
 
         // Draw function copied from parent
         ctx.beginPath();
@@ -517,8 +523,6 @@ const SCENES: Node[][] = [
         new Text({x: 30, y: 440}, "  Settings", Color.of("#000"), 32, "monospace"),
         new Text({x: 30, y: 480}, "  About", Color.of("#000"), 32, "monospace"),
         new Text({x: 30, y: 520}, "  Credits", Color.of("#000"), 32, "monospace"),
-
-        new AnimatedLine({x: 0, y: 0}, {x: 10, y: 10}, Color.of("#000"), "round", 10)
     ],
     [
         // Platform
@@ -527,8 +531,36 @@ const SCENES: Node[][] = [
         // Player
         new Circle({x: 590, y: 310}, 50, Color.of("#0f9369")),
 
-        // Menu
+        // Menu toggle
+        new RoundRect({x: CONFIG.WIDTH - 80, y: 16}, {x: 64, y: 64}, Color.of("#ccc"), 16),
+        new AnimatedLine({x: CONFIG.WIDTH - 66, y: 34}, {x: CONFIG.WIDTH - 30, y: 34}, Color.of("#000"), "round", 4),
+        new AnimatedLine({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 30, y: 48}, Color.of("#000"), "round", 4),
+        new AnimatedLine({x: CONFIG.WIDTH - 66, y: 62}, {x: CONFIG.WIDTH - 30, y: 62}, Color.of("#000"), "round", 4),
+        new RoundRect({x: CONFIG.WIDTH - 80, y: 16}, {x: 64, y: 64}, Color.of("#00000000"), 16).setonclick((node) => {
+            const menuDisplay = [
+                // new Rect({x: CONFIG.WIDTH - 80, y: 72}, {x: 64, y: 40}, Color.of("#ccc")),
+                new RoundRect({x: CONFIG.WIDTH - 216, y: 80}, {x: 200, y: 80}, Color.of("#ccc"), 32),
+                new RoundRect({x: CONFIG.WIDTH - 200, y: 96}, {x: 168, y: 48}, Color.of("#aaa"), 16).setonclick(() => {
+                    changeScene(0);
+                    if (node.onclick !== undefined) node.onclick();
+                }),
+                new Text({x: CONFIG.WIDTH - 189, y: 131}, "Main Menu", Color.of("#000"), 29),
+            ];
 
+            const opened = (tmp.sceneMemory.get("opened") || false) === true, sc = tmp.scenes[1];
+            if (opened) {
+                (sc.at(3) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
+                (sc.at(4) as AnimatedLine).animate({x: CONFIG.WIDTH - 48, y: 30}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
+                (sc.at(5) as AnimatedLine).animate({x: CONFIG.WIDTH - 30, y: 48}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
+                tmp.scenes[1].push(...menuDisplay);
+            } else {
+                (sc.at(3) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 34}, {x: CONFIG.WIDTH - 30, y: 34}, 1);
+                (sc.at(4) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 30, y: 48}, 1);
+                (sc.at(5) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 62}, {x: CONFIG.WIDTH - 30, y: 62}, 1);
+                tmp.scenes[1].splice(7, menuDisplay.length);
+            }
+            tmp.sceneMemory.set("opened", !opened);
+        }),
     ]
 ];
 
@@ -635,8 +667,6 @@ const SCENE_INIT: (() => void)[] = [
     () => {
         tmp.sceneMemory.set("currentOption", 0);
         tmp.sceneMemory.set("last", 0);
-
-        (tmp.scenes[0][11] as AnimatedLine).animate({x: CONFIG.WIDTH - 10, y: CONFIG.HEIGHT - 10}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, 0.1);
     }
 ];
 function changeScene(scene: number) {
