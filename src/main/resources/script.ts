@@ -1,21 +1,40 @@
 export {}
 
+// Types
+type Size = {
+    x: number,
+    y: number
+}
+type PhysicsProperties = {
+    enabled: boolean,
+    y: {
+        velocity: number,
+        acceleration: number
+    },
+    collides: boolean,
+    collidable: boolean
+}
+type Coordinate = {
+    x: number,
+    y: number
+}
+
 let error = false;
 
-// Creation of the canvas
-const canvas = document.getElementsByTagName("canvas")[0];
 
 abstract class Node {
     protected loc: Coordinate;
     public onclick?: () => void;
     public onhover?: () => void;
     public onunhover?: () => void;
-    public collide = false;
     public physics: PhysicsProperties = {
+        enabled: false,
         y: {
             velocity: 0,
             acceleration: CONFIG.GRAVITY
-        }
+        },
+        collides: false,
+        collidable: false
     }
 
     constructor(loc: Coordinate) {
@@ -25,36 +44,24 @@ abstract class Node {
     public getLoc() {
         return this.loc;
     }
-
     public getX() {
         return this.loc.x;
     }
-    
     public getY() {
         return this.loc.y;
     }
 
+    public setPhysics(newPhysics: PhysicsProperties) {
+        this.physics = newPhysics;
+    }
     public setLoc(newLoc: Coordinate) {
         this.loc = newLoc;
     }
-
     public setX(newX: number) {
         this.loc.x = newX;
     }
-
     public setY(newY: number) {
         this.loc.y = newY;
-    }
-
-    // Collisions
-    public setCollide(newCollide: boolean) {
-        this.collide = newCollide;
-    }
-    public checkCollide() {
-        const currentScene = tmp.scenes[tmp.currentScene];
-        for (const node of currentScene) {
-            // TODO: Add collision checking
-        }
     }
 
     public setonclick(lambda: (node: this) => void) {
@@ -72,18 +79,6 @@ abstract class Node {
 
     public abstract draw(ctx: CanvasRenderingContext2D): void;
     public abstract contains(point: Coordinate): boolean;
-}
-
-type Size = {
-    x: number,
-    y: number
-}
-
-type PhysicsProperties = {
-    y: {
-        velocity: number,
-        acceleration: number
-    }
 }
 
 class Rect extends Node {
@@ -309,15 +304,6 @@ class Image extends Node {
     }
 }
 
-type Coordinate = {
-    x: number,
-    y: number
-}
-
-// function equalCoordinates(first: Coordinate, second: Coordinate) {
-//     return first.x === second.x && first.y === second.y;
-// }
-
 class Line extends Node {
     protected end: Coordinate;
     protected color: Color;
@@ -347,15 +333,19 @@ class Line extends Node {
 
     public setEnd(newEnd: Coordinate) {
         this.end = newEnd;
+        return this;
     }
     public setColor(newColor: Color) {
         this.color = newColor;
+        return this;
     }
     public setLineCap(newLineCap: CanvasLineCap) {
         this.lineCap = newLineCap;
+        return this;
     }
     public setLineWidth(newLineWidth: number) {
         this.lineWidth = newLineWidth;
+        return this;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -378,6 +368,49 @@ class Line extends Node {
         const toReturn = ctx.isPointInStroke(path, point.x, point.y);
         ctx.restore();
         return toReturn;
+    }
+}
+type AnimatedProperties = {
+    in: boolean,
+    start: Coordinate,
+    end: Coordinate,
+    movesPerTick: number
+}
+class AnimatedLine extends Line {
+    public animated: AnimatedProperties = {
+        in: false,
+        start: {x: 0, y: 0},
+        end: {x: 0, y: 0},
+        movesPerTick: 0
+    };
+
+    constructor(start: Coordinate, end: Coordinate, color: Color = Color.of("#000"), lineCap: CanvasLineCap = "butt", lineWidth: number = 1) {
+        super(start, end, color, lineCap, lineWidth);
+    }
+
+    public animate(newStart: Coordinate, newEnd: Coordinate, movesPerTick: number = 1) {
+        this.animated.in = true;
+        this.animated.start = newStart;
+        this.animated.end = newEnd;
+        this.animated.movesPerTick = movesPerTick;
+    }
+
+    public draw(ctx: CanvasRenderingContext2D) {
+        // Animated movement
+        this.loc.x += Math.min(this.animated.movesPerTick, this.animated.start.x - this.loc.x);
+        this.loc.y += Math.min(this.animated.movesPerTick, this.animated.start.y - this.loc.y);
+        this.end.x += Math.min(this.animated.movesPerTick, this.animated.end.x - this.end.x);
+        this.end.y += Math.min(this.animated.movesPerTick, this.animated.end.y - this.end.y);
+        console.log("Position: (x: " + this.loc.x + ", y: " + this.loc.y + ") to (x: " + this.end.x + ", y: " + this.end.y + ")");
+
+        // Draw function copied from parent
+        ctx.beginPath();
+        ctx.moveTo(this.loc.x, this.loc.y);
+        ctx.lineTo(this.end.x, this.end.y);
+        ctx.strokeStyle = this.color.toString();
+        ctx.lineWidth = this.lineWidth;
+        ctx.lineCap = this.lineCap;
+        ctx.stroke();
     }
 }
 
@@ -459,10 +492,9 @@ const CONFIG = {
         "down": ["KeyS", "ArrowDown"],
         "left": ["KeyA", "ArrowLeft"],
         "enter": ["Enter", "Space"]
-    }
+    },
+    INITIAL_SCENE: 0
 }
-
-const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 
 const SCENES: Node[][] = [
     // Menu
@@ -485,6 +517,8 @@ const SCENES: Node[][] = [
         new Text({x: 30, y: 440}, "  Settings", Color.of("#000"), 32, "monospace"),
         new Text({x: 30, y: 480}, "  About", Color.of("#000"), 32, "monospace"),
         new Text({x: 30, y: 520}, "  Credits", Color.of("#000"), 32, "monospace"),
+
+        new AnimatedLine({x: 0, y: 0}, {x: 10, y: 10}, Color.of("#000"), "round", 10)
     ],
     [
         // Platform
@@ -494,15 +528,11 @@ const SCENES: Node[][] = [
         new Circle({x: 590, y: 310}, 50, Color.of("#0f9369")),
 
         // Menu
+
     ]
 ];
-type inputMapping = {
-    up?: () => void,
-    right?: () => void,
-    down?: () => void,
-    left?: () => void,
-    enter?: () => void
-}
+
+// Scene inputs
 function clickRatelimited(): boolean {
     const lastPressed = (tmp.sceneMemory.get("last") || 0) as number, currentTime = Date.now();
     if (currentTime - lastPressed <= CONFIG.CLICK_RATELIMIT_MS_LENGTH) return true;
@@ -535,20 +565,24 @@ function scene0menuPopup(menu: number) {
             }).setonhover(() => document.body.style.cursor = "pointer").setonunhover(() => document.body.style.cursor = "")
         ],
         [
-
+            new Text({x: 64, y: 140}, "This is a simple beginner canvas game. Most of development was spent on the rendering engine, so the", Color.of("#000"), 24, "sans-serif"),
+            new Text({x: 64, y: 164}, "actual game won't be of the same quality as a Godot game made with the same time.", Color.of("#000"), 24, "sans-serif")
         ],
         [
-            
+            new Text({x: 64, y: 140}, "All code and assets made by Jazhdo.", Color.of("#000"), 24, "sans-serif"),
+            new Text({x: 64, y: 164}, "Zero AI usage. If this project is flagged for AI, those are false flags.", Color.of("#000"), 24, "sans-serif"),
         ]
-    ], commonElements = [
+    ],
+    pageNames = ["Settings", "About", "Credits"],
+    commonElements = [
         // Background
-        new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#00000088")),
+        new Rect({x: 0, y: 0}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, Color.of("#00000088")).setonclick(() => tmp.scenes[0] = tmp.scenes[0].slice(0, -(6 + popupElements[menu].length))),
 
         // Popup
         new RoundRect({x: 40, y: 40}, {x: CONFIG.WIDTH - 80, y: CONFIG.HEIGHT - 80}, Color.of("#dcdcdc"), 40),
 
         // Title
-        new Text({x: 64, y: 100}, "Placeholder", Color.of("#000"), 40),
+        new Text({x: 64, y: 100}, pageNames[menu], Color.of("#000"), 40),
 
         // Exit button
         new Circle({x: CONFIG.WIDTH - 85, y: 85}, 25, Color.of("#f00")).setonhover((node) => {
@@ -557,26 +591,27 @@ function scene0menuPopup(menu: number) {
         }).setonunhover((node) => {
             document.body.style.cursor = "";
             node.setFill(Color.of("#f00"))
-        }),
+        }).setonclick(() => tmp.scenes[0] = tmp.scenes[0].slice(0, -(6 + popupElements[menu].length))),
         new Line({x: CONFIG.WIDTH - 75, y: 75}, {x: CONFIG.WIDTH - 95, y: 95}, Color.of("#000"), "round", 2),
         new Line({x: CONFIG.WIDTH - 95, y: 75}, {x: CONFIG.WIDTH - 75, y: 95}, Color.of("#000"), "round", 2),
-    ], pageNames = ["Settings", "About", "Credits"];
-    (commonElements[2] as Text).setContent(pageNames[menu]);
-    commonElements[3].setonclick(() => tmp.scenes[0] = tmp.scenes[0].slice(0, -(6 + popupElements[menu].length)))
+    ];
 
     tmp.scenes[0].push(...commonElements, ...popupElements[menu]);
 }
+type inputMapping = {
+    before?: () => boolean,
+    up?: () => void,
+    right?: () => void,
+    down?: () => void,
+    left?: () => void,
+    enter?: () => void
+}
 const SCENE_INPUTS: inputMapping[] = [
     {
-        up: () => {
-            if (!clickRatelimited()) scene0refreshOptions((oldOption) => oldOption === 0 ? 3 : oldOption - 1);
-        },
-        down: () => {
-            if (!clickRatelimited()) scene0refreshOptions((oldOption) => oldOption === 3 ? 0 : oldOption + 1);
-        },
-        enter: () => {
-            if (!clickRatelimited()) scene0clickOption();
-        }
+        before: () => !clickRatelimited(),
+        up: () => scene0refreshOptions((oldOption) => oldOption === 0 ? 3 : oldOption - 1),
+        down: () => scene0refreshOptions((oldOption) => oldOption === 3 ? 0 : oldOption + 1),
+        enter: scene0clickOption
     },
     {
         up: () => {
@@ -594,53 +629,43 @@ const SCENE_INPUTS: inputMapping[] = [
         }
     }
 ];
+
+// Scene change / init
 const SCENE_INIT: (() => void)[] = [
     () => {
         tmp.sceneMemory.set("currentOption", 0);
         tmp.sceneMemory.set("last", 0);
+
+        (tmp.scenes[0][11] as AnimatedLine).animate({x: CONFIG.WIDTH - 10, y: CONFIG.HEIGHT - 10}, {x: CONFIG.WIDTH, y: CONFIG.HEIGHT}, 0.1);
     }
 ];
+function changeScene(scene: number) {
+    tmp.keysDown = new Set<string>();
+    tmp.sceneMemory = new Map<string, any>();
+    tmp.currentScene = scene;
+    if (SCENE_INIT[scene] !== undefined) SCENE_INIT[scene]();
+}
+
+// Main variables
+const canvas = document.getElementsByTagName("canvas")[0];
+const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 let tmp = {
     scenes: SCENES,
     sceneMemory: new Map<string, any>(),
-    currentScene: 0,
+    currentScene: CONFIG.INITIAL_SCENE,
     keysDown: new Set<string>()
 };
 
-function start(): void {
-    canvas.height = CONFIG.HEIGHT;
-    canvas.width = CONFIG.WIDTH;
-    canvas.onclick = onclick;
-    document.onmousemove = onmousemove;
-    document.onkeydown = (ev: KeyboardEvent) => Object.entries(CONFIG.INPUT_MAP).forEach((value: [string, string[]]) => value[1].includes(ev.code) && tmp.keysDown.add(value[0]));
-    document.onkeyup = (ev: KeyboardEvent) => Object.entries(CONFIG.INPUT_MAP).forEach((value: [string, string[]]) => value[1].includes(ev.code) && tmp.keysDown.delete(value[0]));
-
-    if (error === true) {
-        console.error("An error occurred during startup, exiting...");
-        return;
-    }
-
-    SCENE_INIT[tmp.currentScene]();
-
-    ctx.save();
-    requestAnimationFrame(renderScreen);
-}
-
+// Main loops
 function renderScreen(): void {
-    // Inputs
-    const currentSceneInputs = SCENE_INPUTS[tmp.currentScene];
-    for (const key of tmp.keysDown as Set<keyof inputMapping>) {
-        if (key in currentSceneInputs) {
-            const keyFunction = currentSceneInputs[key];
-            if (keyFunction) keyFunction();
-        }
-    }
+    // Inputs per scene
+    const si = SCENE_INPUTS[tmp.currentScene];
+    for (const key of tmp.keysDown as Set<keyof inputMapping>) key in si && (si.before === undefined || si.before()) && (si[key] as () => void)();
 
     // Gravity physics (ground is on y500)
     const player = tmp.scenes[1][1];
-    if (player.getY() < 500) {
-        player.physics.y.velocity += player.physics.y.acceleration;
-    } else if (player.getY() > 500) player.setY(500);
+    if (player.getY() < 500) player.physics.y.velocity += player.physics.y.acceleration;
+    else if (player.getY() > 500) player.setY(500);
     player.setY(Math.min(500, player.getY() + player.physics.y.velocity));
 
     // Render
@@ -651,12 +676,6 @@ function renderScreen(): void {
 
     // Next frame
     requestAnimationFrame(renderScreen);
-}
-
-function changeScene(scene: number) {
-    tmp.keysDown = new Set<string>();
-    tmp.sceneMemory = new Map<string, any>();
-    tmp.currentScene = scene;
 }
 
 // Mouse position helpers
@@ -706,7 +725,22 @@ function onmousemove(this: GlobalEventHandlers, ev: MouseEvent): void {
     }
 }
 
-start();
+function start(): void {
+    canvas.height = CONFIG.HEIGHT;
+    canvas.width = CONFIG.WIDTH;
+    canvas.onclick = onclick;
+    document.onmousemove = onmousemove;
+    document.onkeydown = (ev: KeyboardEvent) => Object.entries(CONFIG.INPUT_MAP).forEach((value: [string, string[]]) => value[1].includes(ev.code) && tmp.keysDown.add(value[0]));
+    document.onkeyup = (ev: KeyboardEvent) => Object.entries(CONFIG.INPUT_MAP).forEach((value: [string, string[]]) => value[1].includes(ev.code) && tmp.keysDown.delete(value[0]));
+
+    SCENE_INIT[CONFIG.INITIAL_SCENE]();
+
+    ctx.save();
+    requestAnimationFrame(renderScreen);
+}
+
+if (error === false) start();
+else console.error("An error occurred while startup, exiting...");
 
 /*
 TODO: 
