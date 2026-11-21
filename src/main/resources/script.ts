@@ -15,12 +15,19 @@ type PhysicsProperties = {
     collidable: boolean,
     collidableSurfaces: CollisionSurface[]
 }
-type Coordinate = {
-    x: number,
-    y: number
-}
-function equalCoordinates(one: Coordinate, two: Coordinate) {
-    return one.x === two.x && one.y === two.y;
+class Coordinate {
+    x!: number;
+    y!: number;
+
+    public static equals(one: Coordinate, two: Coordinate) {
+        return one.x === two.x && one.y === two.y;
+    }
+    public static copy(point: Coordinate) {
+        return {x: point.x, y: point.y};
+    }
+    public static toString(point: Coordinate) {
+        return "(x: " + point.x + ", y: " + point.y + ")";
+    }
 }
 type CollisionSurface = {}
 type CollisionPlane = CollisionSurface & {
@@ -463,7 +470,7 @@ class AnimatedLine extends Line {
             this.loc.y += Math.min(this.animated.movesPerTick, this.animated.start.y - this.loc.y);
             this.end.x += Math.min(this.animated.movesPerTick, this.animated.end.x - this.end.x);
             this.end.y += Math.min(this.animated.movesPerTick, this.animated.end.y - this.end.y);
-            if (equalCoordinates(this.loc, this.animated.start) && equalCoordinates(this.end, this.animated.end)) this.animated.in = false;
+            if (Coordinate.equals(this.loc, this.animated.start) && Coordinate.equals(this.end, this.animated.end)) this.animated.in = false;
         }
 
         // Draw function copied from parent
@@ -590,6 +597,7 @@ const SCENES: Node[][] = [
     [
         // Platform
         new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35),
+        new RoundRect({x: CONFIG.WIDTH / 2, y: 300}, {x: CONFIG.WIDTH / 2, y: 70}, Color.of("#afbcff"), 35),
 
         // Player
         new Circle({x: CONFIG.WIDTH / 2, y: CONFIG.HEIGHT / 2}, 50, Color.of("#0f9369")),
@@ -711,15 +719,18 @@ const SCENE_INPUTS: inputMapping[] = [
     {
         up: () => {
             // Jump
-            const player = tmp.scenes[1][1];
-            if (player.getY() >= 500) player.physics.y.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
+            const player = tmp.scenes[1][2] as Circle;
+            if (anyCollision({x: player.getX(), y: player.getY() + player.getRadius() + 1}, player)) {
+                player.physics.y.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
+                player.setY(player.getY() + player.physics.y.velocity);
+            }
         },
         left: () => {
-            const player = tmp.scenes[1][1];
+            const player = tmp.scenes[1][2];
             player.setX(Math.max(50, player.getX() - CONFIG.PLAYER.SPEED));
         },
         right: () => {
-            const player = tmp.scenes[1][1];
+            const player = tmp.scenes[1][2];
             player.setX(Math.min(CONFIG.WIDTH - 50, player.getX() + CONFIG.PLAYER.SPEED));
         }
     }
@@ -749,33 +760,27 @@ let tmp = {
     keysDown: new Set<string>()
 };
 
-function copyCoordinate(point: Coordinate) {
-    return {x: point.x, y: point.y};
-}
-function coordinateToString(point: Coordinate) {
-    return "(x: " + point.x + ", y: " + point.y + ")";
-}
 function anyCollision(point: Coordinate, check: Node) {
     const nodes = tmp.scenes[1].filter(node => node !== check);
     for (const node of nodes) if (node.contains(point)) return true;
     return false;
 }
 function playerColliding(points: number) {
-    const player = tmp.scenes[1][1] as Circle, check: Coordinate[] = [];
+    const player = tmp.scenes[1][2] as Circle, check: Coordinate[] = [];
     if ((points >> 3) && 0b0001) {
-        const center = copyCoordinate(player.getLoc());
+        const center = Coordinate.copy(player.getLoc());
         center.y += player.getRadius();
         check.push(center)
     } else if ((points >> 2) && 0b0001) {
-        const center = copyCoordinate(player.getLoc());
+        const center = Coordinate.copy(player.getLoc());
         center.x += player.getRadius();
         check.push(center);
     } else if ((points >> 1) && 0b0001) {
-        const center = copyCoordinate(player.getLoc());
+        const center = Coordinate.copy(player.getLoc());
         center.y -= player.getRadius();
         check.push(center);
     } else if (points && 0b0001) {
-        const center = copyCoordinate(player.getLoc());
+        const center = Coordinate.copy(player.getLoc());
         center.x -= player.getRadius();
         check.push(center);
     }
@@ -790,14 +795,15 @@ function renderScreen(): void {
     for (const key of tmp.keysDown as Set<keyof inputMapping>) key in si && (si.before === undefined || si.before()) && (si[key] as () => void)();
 
     // Gravity physics (ground is on y500)
-    const player = tmp.scenes[1][1];
+    const player = tmp.scenes[1][2];
     if (!playerColliding(0b1111)) {
         player.physics.y.velocity += player.physics.y.acceleration;
-        const wantedY = player.getY() + player.physics.y.velocity;
-        console.log("Wanted y: " + wantedY)
-        player.setY(Math.min(CONFIG.HEIGHT, wantedY));
+        player.setY(Math.min(CONFIG.HEIGHT, player.getY() + player.physics.y.velocity));
+    } else {
+        player.physics.y.velocity = 0;
+        player.setY(player.getY() - 1);
+        if (!playerColliding(0b1111)) player.setY(player.getY() + 1);
     }
-    // console.log("Player Location: (x: " + player.getX() + ", y: " + player.getY() + ")");
 
     // Render
     ctx.restore();
