@@ -12,7 +12,8 @@ type PhysicsProperties = {
         acceleration: number
     },
     collides: boolean,
-    collidable: boolean
+    collidable: boolean,
+    collidableSurfaces: CollisionSurface[]
 }
 type Coordinate = {
     x: number,
@@ -21,9 +22,19 @@ type Coordinate = {
 function equalCoordinates(one: Coordinate, two: Coordinate) {
     return one.x === two.x && one.y === two.y;
 }
+type CollisionSurface = {}
+type CollisionPlane = CollisionSurface & {
+    startPoint: number,
+    commonCoordinate: number,
+    commonCoordinatePlane: "x" | "y",
+    endPoint: number
+}
+type CollisionCircle = CollisionSurface & {
+    center: Coordinate,
+    radius: number
+}
 
 let error = false;
-
 
 abstract class Node {
     protected loc: Coordinate;
@@ -37,8 +48,9 @@ abstract class Node {
             acceleration: CONFIG.GRAVITY
         },
         collides: false,
-        collidable: false
-    }
+        collidable: false,
+        collidableSurfaces: []
+    };
 
     constructor(loc: Coordinate) {
         this.loc = loc;
@@ -56,6 +68,12 @@ abstract class Node {
 
     public setPhysics(newPhysics: PhysicsProperties) {
         this.physics = newPhysics;
+    }
+    public setCollides(newCollides: boolean) {
+        this.physics.collides = newCollides;
+    }
+    public setCollidable(newCollidable: boolean) {
+        this.physics.collidable = newCollidable;
     }
     public setLoc(newLoc: Coordinate) {
         this.loc = newLoc;
@@ -96,6 +114,32 @@ class Rect extends Node {
         this.backgroundColor = backgroundColor;
         this.borderWidth = borderWidth;
         this.borderColor = borderColor;
+        this.physics.collidableSurfaces = [
+            {
+                startPoint: this.loc.x,
+                commonCoordinate: this.loc.y,
+                commonCoordinatePlane: "y",
+                endPoint: this.loc.x + this.size.x
+            } as CollisionPlane,
+            {
+                startPoint: this.loc.y,
+                commonCoordinate: this.loc.x + this.size.x,
+                commonCoordinatePlane: "x",
+                endPoint: this.loc.y + this.size.y
+            } as CollisionPlane,
+            {
+                startPoint: this.loc.x,
+                commonCoordinate: this.loc.y + this.size.y,
+                commonCoordinatePlane: "y",
+                endPoint: this.loc.x + this.size.x
+            } as CollisionPlane,
+            {
+                startPoint: this.loc.y,
+                commonCoordinate: this.loc.x,
+                commonCoordinatePlane: "x",
+                endPoint: this.loc.y + this.size.y
+            } as CollisionPlane
+        ]
     }
 
     public setTopRightCorner(newCorner: Coordinate) {
@@ -167,6 +211,11 @@ class RoundRect extends Rect {
     constructor(topRightCorner: Coordinate, size: Size, backgroundColor: Color, borderRadius: number, borderWidth?: number, borderColor?: Color) {
         super(topRightCorner, size, backgroundColor, borderWidth, borderColor);
         this.borderRadius = borderRadius;
+        this.physics.collidableSurfaces = [
+            {
+                // Gave up here; just use contains with the four points on the four axises points on the circle player (-x, -y, x, & Y)
+            }
+        ];
     }
 
     public setBorderRadius(newBorderRadius: number) {
@@ -319,6 +368,15 @@ class Line extends Node {
         this.color = color;
         this.lineCap = lineCap;
         this.lineWidth = lineWidth;
+        const collidableSurfaceIsX = start.x === end.x;
+        this.physics.collidableSurfaces = [
+            {
+                startPoint: collidableSurfaceIsX ? start.y : start.x,
+                commonCoordinate: collidableSurfaceIsX ? start.x : start.y,
+                commonCoordinatePlane: collidableSurfaceIsX ? "x" : "y",
+                endPoint: collidableSurfaceIsX ? end.y : end.x
+            } as CollisionPlane
+        ]
     }
 
     public getEnd() {
@@ -407,7 +465,6 @@ class AnimatedLine extends Line {
             this.end.y += Math.min(this.animated.movesPerTick, this.animated.end.y - this.end.y);
             if (equalCoordinates(this.loc, this.animated.start) && equalCoordinates(this.end, this.animated.end)) this.animated.in = false;
         }
-        // console.log("Position: (x: " + this.loc.x + ", y: " + this.loc.y + ") to (x: " + this.end.x + ", y: " + this.end.y + ")");
 
         // Draw function copied from parent
         ctx.beginPath();
@@ -433,6 +490,12 @@ class Circle extends Node {
         this.fill = fill;
         this.borderWidth = borderWidth;
         this.borderColor = borderColor;
+        this.physics.collidableSurfaces = [
+            {
+                center: this.loc,
+                radius: this.radius
+            } as CollisionCircle
+        ];
     }
 
     public getRadius() {
@@ -548,15 +611,15 @@ const SCENES: Node[][] = [
             ];
 
             const opened = (tmp.sceneMemory.get("opened") || false) === true, sc = tmp.scenes[1];
-            if (opened) {
-                (sc.at(3) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
-                (sc.at(4) as AnimatedLine).animate({x: CONFIG.WIDTH - 48, y: 30}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
-                (sc.at(5) as AnimatedLine).animate({x: CONFIG.WIDTH - 30, y: 48}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
+            if (!opened) {
+                (sc.at(-4) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
+                (sc.at(-3) as AnimatedLine).animate({x: CONFIG.WIDTH - 48, y: 30}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
+                (sc.at(-2) as AnimatedLine).animate({x: CONFIG.WIDTH - 30, y: 48}, {x: CONFIG.WIDTH - 48, y: 66}, 1);
                 tmp.scenes[1].push(...menuDisplay);
             } else {
-                (sc.at(3) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 34}, {x: CONFIG.WIDTH - 30, y: 34}, 1);
-                (sc.at(4) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 30, y: 48}, 1);
-                (sc.at(5) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 62}, {x: CONFIG.WIDTH - 30, y: 62}, 1);
+                (sc.at(-4 - menuDisplay.length) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 34}, {x: CONFIG.WIDTH - 30, y: 34}, 1);
+                (sc.at(-3 - menuDisplay.length) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 30, y: 48}, 1);
+                (sc.at(-2 - menuDisplay.length) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 62}, {x: CONFIG.WIDTH - 30, y: 62}, 1);
                 tmp.scenes[1].splice(7, menuDisplay.length);
             }
             tmp.sceneMemory.set("opened", !opened);
@@ -686,6 +749,34 @@ let tmp = {
     keysDown: new Set<string>()
 };
 
+function anyCollision(point: Coordinate) {
+    const nodes = tmp.scenes[tmp.currentScene];
+    for (const node of nodes) if (node.contains(point)) return true;
+    return false;
+}
+function playerColliding(points: number) {
+    const player = tmp.scenes[1][1] as Circle, check: Coordinate[] = [];
+    if ((points >> 3) && 0b0001) {
+        const center = player.getLoc();
+        center.y += player.getRadius();
+        check.push(center)
+    } else if ((points >> 2) && 0b0001) {
+        const center = player.getLoc();
+        center.x += player.getRadius();
+        check.push(center);
+    } else if ((points >> 1) && 0b0001) {
+        const center = player.getLoc();
+        center.y -= player.getRadius();
+        check.push(center);
+    } else if (points && 0b0001) {
+        const center = player.getLoc();
+        center.x -= player.getRadius();
+        check.push(center);
+    }
+    for (const coord of check) if (anyCollision(coord)) return true;
+    return false;
+}
+
 // Main loops
 function renderScreen(): void {
     // Inputs per scene
@@ -694,9 +785,13 @@ function renderScreen(): void {
 
     // Gravity physics (ground is on y500)
     const player = tmp.scenes[1][1];
-    if (player.getY() < 500) player.physics.y.velocity += player.physics.y.acceleration;
-    else if (player.getY() > 500) player.setY(500);
-    player.setY(Math.min(500, player.getY() + player.physics.y.velocity));
+    if (!playerColliding(0b1111)) {
+        player.physics.y.velocity += player.physics.y.acceleration;
+        const newY = Math.min(CONFIG.HEIGHT, player.getY() + player.physics.y.velocity);
+        player.setY(newY);
+        console.log("New Y: " + newY);
+    } else console.log("Collided!");
+    console.log("Player Location: (x: " + player.getX() + ", y: " + player.getY() + ")");
 
     // Render
     ctx.restore();
