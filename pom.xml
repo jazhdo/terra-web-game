@@ -36,6 +36,12 @@
             <artifactId>swc4j-linux-arm64</artifactId>
             <version>2.2.0</version>
         </dependency>
+        <!-- New produciton server dependency -->
+        <dependency>
+            <groupId>com.caoccao.javet</groupId>
+            <artifactId>swc4j-linux-x86_64</artifactId>
+            <version>2.2.0</version>
+        </dependency>
         <!-- Development computer dependency -->
         <dependency>
             <groupId>com.caoccao.javet</groupId>
