@@ -75,21 +75,27 @@ abstract class Node {
 
     public setPhysics(newPhysics: PhysicsProperties) {
         this.physics = newPhysics;
+        return this;
     }
     public setCollides(newCollides: boolean) {
         this.physics.collides = newCollides;
+        return this;
     }
     public setCollidable(newCollidable: boolean) {
         this.physics.collidable = newCollidable;
+        return this;
     }
     public setLoc(newLoc: Coordinate) {
         this.loc = newLoc;
+        return this;
     }
     public setX(newX: number) {
         this.loc.x = newX;
+        return this;
     }
     public setY(newY: number) {
         this.loc.y = newY;
+        return this;
     }
 
     public setonclick(lambda: (node: this) => void) {
@@ -559,7 +565,8 @@ const CONFIG = {
     CLICK_RATELIMIT_MS_LENGTH: 150,
     PLAYER: {
         SPEED: 20,
-        JUMP_HEIGHT: -50
+        JUMP_HEIGHT: -50,
+        SCENE_1_INDEX: 4
     },
     GRAVITY: 5,
     INPUT_MAP: {
@@ -596,8 +603,10 @@ const SCENES: Node[][] = [
     ],
     [
         // Platform
-        new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35),
-        new RoundRect({x: CONFIG.WIDTH / 2, y: 300}, {x: CONFIG.WIDTH / 2, y: 70}, Color.of("#afbcff"), 35),
+        new RoundRect({x: CONFIG.WIDTH / 2, y: 40}, {x: CONFIG.WIDTH / 2, y: 70}, Color.of("#afbcff"), 35).setCollidable(true),
+        new RoundRect({x: 0, y: 210}, {x: CONFIG.WIDTH / 2, y: 70}, Color.of("#afbcff"), 35).setCollidable(true),
+        new RoundRect({x: 0, y: 550}, {x: CONFIG.WIDTH, y: 70}, Color.of("#afbc4f"), 35).setCollidable(true),
+        new RoundRect({x: CONFIG.WIDTH / 2, y: 380}, {x: CONFIG.WIDTH / 2, y: 70}, Color.of("#afbcff"), 35).setCollidable(true),
 
         // Player
         new Circle({x: CONFIG.WIDTH / 2, y: CONFIG.HEIGHT / 2}, 50, Color.of("#0f9369")),
@@ -609,11 +618,10 @@ const SCENES: Node[][] = [
         new AnimatedLine({x: CONFIG.WIDTH - 66, y: 62}, {x: CONFIG.WIDTH - 30, y: 62}, Color.of("#000"), "round", 4),
         new RoundRect({x: CONFIG.WIDTH - 80, y: 16}, {x: 64, y: 64}, Color.of("#00000000"), 16).setonclick((node) => {
             const menuDisplay = [
-                // new Rect({x: CONFIG.WIDTH - 80, y: 72}, {x: 64, y: 40}, Color.of("#ccc")),
                 new RoundRect({x: CONFIG.WIDTH - 216, y: 80}, {x: 200, y: 80}, Color.of("#ccc"), 32),
                 new RoundRect({x: CONFIG.WIDTH - 200, y: 96}, {x: 168, y: 48}, Color.of("#aaa"), 16).setonclick(() => {
-                    changeScene(0);
                     if (node.onclick !== undefined) node.onclick();
+                    changeScene(0);
                 }),
                 new Text({x: CONFIG.WIDTH - 189, y: 131}, "Main Menu", Color.of("#000"), 29),
             ];
@@ -628,7 +636,7 @@ const SCENES: Node[][] = [
                 (sc.at(-4 - menuDisplay.length) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 34}, {x: CONFIG.WIDTH - 30, y: 34}, 1);
                 (sc.at(-3 - menuDisplay.length) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 48}, {x: CONFIG.WIDTH - 30, y: 48}, 1);
                 (sc.at(-2 - menuDisplay.length) as AnimatedLine).animate({x: CONFIG.WIDTH - 66, y: 62}, {x: CONFIG.WIDTH - 30, y: 62}, 1);
-                tmp.scenes[1].splice(7, menuDisplay.length);
+                tmp.scenes[1].splice(10, menuDisplay.length);
             }
             tmp.sceneMemory.set("opened", !opened);
         }),
@@ -664,6 +672,14 @@ function scene0menuPopup(menu: number) {
             new Circle({x: 171, y: 131}, 11, localStorage.getItem("setting.cheats") === "true" ? Color.of("#0f0") : Color.of("#f00"), 1, Color.of("#444")).setonclick((node) => {
                 const cheats = localStorage.getItem("setting.cheats") === "true";
                 localStorage.setItem("setting.cheats", cheats ? "false" : "true");
+                node.setFill(Color.of(cheats ? "#f00" : "#0f0"));
+            }).setonhover(() => document.body.style.cursor = "pointer").setonunhover(() => document.body.style.cursor = ""),
+
+            // Unlimited jump toggle
+            new Text({x: 64, y: 164}, "Unlimited Jumps:", Color.of("#000"), 24, "sans-serif"),
+            new Circle({x: 272, y: 155}, 11, localStorage.getItem("setting.unlimited_jumps") === "true" ? Color.of("#0f0") : Color.of("#f00"), 1, Color.of("#444")).setonclick((node) => {
+                const cheats = localStorage.getItem("setting.unlimited_jumps") === "true";
+                localStorage.setItem("setting.unlimited_jumps", cheats ? "false" : "true");
                 node.setFill(Color.of(cheats ? "#f00" : "#0f0"));
             }).setonhover(() => document.body.style.cursor = "pointer").setonunhover(() => document.body.style.cursor = "")
         ],
@@ -719,18 +735,18 @@ const SCENE_INPUTS: inputMapping[] = [
     {
         up: () => {
             // Jump
-            const player = tmp.scenes[1][2] as Circle;
-            if (anyCollision({x: player.getX(), y: player.getY() + player.getRadius() + 1}, player)) {
+            const player = tmp.scenes[1][CONFIG.PLAYER.SCENE_1_INDEX] as Circle;
+            if (localStorage.getItem("setting.unlimited_jumps") === "true" || anyCollision({x: player.getX(), y: player.getY() + player.getRadius() + 1}, player)) {
                 player.physics.y.velocity = CONFIG.PLAYER.JUMP_HEIGHT;
                 player.setY(player.getY() + player.physics.y.velocity);
             }
         },
         left: () => {
-            const player = tmp.scenes[1][2];
+            const player = tmp.scenes[1][CONFIG.PLAYER.SCENE_1_INDEX];
             player.setX(Math.max(50, player.getX() - CONFIG.PLAYER.SPEED));
         },
         right: () => {
-            const player = tmp.scenes[1][2];
+            const player = tmp.scenes[1][CONFIG.PLAYER.SCENE_1_INDEX];
             player.setX(Math.min(CONFIG.WIDTH - 50, player.getX() + CONFIG.PLAYER.SPEED));
         }
     }
@@ -762,11 +778,11 @@ let tmp = {
 
 function anyCollision(point: Coordinate, check: Node) {
     const nodes = tmp.scenes[1].filter(node => node !== check);
-    for (const node of nodes) if (node.contains(point)) return true;
+    for (const node of nodes) if (node.physics.collidable && node.contains(point)) return true;
     return false;
 }
 function playerColliding(points: number) {
-    const player = tmp.scenes[1][2] as Circle, check: Coordinate[] = [];
+    const player = tmp.scenes[1][CONFIG.PLAYER.SCENE_1_INDEX] as Circle, check: Coordinate[] = [];
     if ((points >> 3) && 0b0001) {
         const center = Coordinate.copy(player.getLoc());
         center.y += player.getRadius();
@@ -795,10 +811,10 @@ function renderScreen(): void {
     for (const key of tmp.keysDown as Set<keyof inputMapping>) key in si && (si.before === undefined || si.before()) && (si[key] as () => void)();
 
     // Gravity physics (ground is on y500)
-    const player = tmp.scenes[1][2];
+    const player = tmp.scenes[1][CONFIG.PLAYER.SCENE_1_INDEX] as Circle;
     if (!playerColliding(0b1111)) {
         player.physics.y.velocity += player.physics.y.acceleration;
-        player.setY(Math.min(CONFIG.HEIGHT, player.getY() + player.physics.y.velocity));
+        player.setY(Math.min(CONFIG.HEIGHT - player.getRadius(), player.getY() + player.physics.y.velocity));
     } else {
         player.physics.y.velocity = 0;
         player.setY(player.getY() - 1);

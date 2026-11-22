@@ -1,0 +1,7 @@
+FROM sourcemation/jdk-25
+
+COPY . /
+
+RUN ./mvnw clean package
+
+CMD [ "java", "--enable-native-access=ALL-UNNAMED", "-jar", "target/WebGame-0.1.0.jar" ]
