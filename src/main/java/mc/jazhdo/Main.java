@@ -98,7 +98,7 @@ public class Main {
         });
 
         String definedPort = System.getenv("PORT");
-        if (definedPort != null) webServer.start(Integer.parseInt(definedPort));
+        if (definedPort != null) webServer.start("0.0.0.0", Integer.parseInt(definedPort));
         else webServer.start();
 
         log.info("Javalin web server started.");
