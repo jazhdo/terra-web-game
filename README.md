@@ -16,3 +16,4 @@ You just need a computer with a keyboard, mouse, a 1080p screen, and a browser s
 
 1. Open the site
 2. Click play
+3. Use w-a-s-d or arrow keys to move
